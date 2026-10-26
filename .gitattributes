@@ -1,0 +1,13 @@
+# Normalise text to LF in the repo; keep each script's native line ending on checkout.
+* text=auto
+ClearRoom/gradlew text eol=lf
+*.bat text eol=crlf
+*.sh text eol=lf
+
+# Binary files: never touch line endings or diff them as text
+*.jar binary
+*.webp binary
+*.png binary
+*.jpg binary
+*.tflite binary
+*.pdf binary

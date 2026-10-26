@@ -1,0 +1,27 @@
+# Android Studio: keep shared code style and inspections, ignore per-machine state
+# (workspace, caches, selected device serial/IP).
+ClearRoom/.idea/*
+!ClearRoom/.idea/codeStyles/
+!ClearRoom/.idea/inspectionProfiles/
+
+# Build outputs and local machine config (the ClearRoom/ template .gitignore covers most of these)
+build/
+.gradle/
+.kotlin/
+local.properties
+captures/
+
+# Signing keys and secrets: never commit
+*.jks
+*.keystore
+keystore.properties
+
+# Claude Code: personal settings and skill-eval scratch
+.claude/settings.local.json
+.claude/skills/*-workspace/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
