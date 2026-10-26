@@ -221,10 +221,10 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 
 **Day 1 of the doc's plan: engine, measurements, 3D core**
 
-- [ ] **M1 — Skeleton.** Material 3 theme (light and dark), 5-tab bottom navigation (Room, Measure, Results, Fixes, Log), microphone permission flow, `AppContainer`, `AppViewModel`, Gradle tuning.
+- [x] **M1 — Skeleton.** Material 3 theme (light and dark), fixed clarity-band colours, 5-tab bottom navigation (Room, Measure, Results, Fixes, Log), microphone permission flow, Gradle tuning. *(Done Oct 26: 12 laptop + 8 phone tests pass.)*
   *Skills:* clearroom-android-foundation, kotlin-solid-clean-code.
   *Done when:* the app installs on the phone, the tabs switch, and the permission prompt appears on the first measurement.
-- [ ] **M2 — Recorder.** `AudioRecord` at 48 kHz mono, microphone source selection, auto-gain and noise suppression off, live level meter, clipping and busy-microphone checks.
+- [ ] **M2 — Recorder.** `AppContainer` and `AppViewModel` (moved from M1: they first hold real state here), `AudioRecord` at 48 kHz mono, microphone source selection, auto-gain and noise suppression off, live level meter, clipping and busy-microphone checks.
   *Skills:* android-audio-capture.
   *Done when:* the Measure tab records 5 s with a moving level bar and shows which microphone source the S24 Ultra uses.
 - [ ] **M3 — Data and Room tab.** Data models, JSON store, room form, seat grid, built-in sample room.

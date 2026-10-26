@@ -1,3 +1,25 @@
 <resources>
     <string name="app_name">ClearRoom</string>
+
+    <!-- Bottom navigation -->
+    <string name="tab_room">Room</string>
+    <string name="tab_measure">Measure</string>
+    <string name="tab_results">Results</string>
+    <string name="tab_fixes">Fixes</string>
+    <string name="tab_log">Log</string>
+
+    <!-- Tab introductions: plain words, no acoustics terms (NFR-2) -->
+    <string name="room_intro">Describe the room: its size, the rows and columns of seats, and what the walls and floor are made of. You can also load a sample room to explore.</string>
+    <string name="measure_intro">Find out how clearly people can hear at each seat. You clap at the front while the phone listens at a few seats, then it checks the background noise.</string>
+    <string name="results_intro">After measuring, you\'ll see which seats can follow the speaker, and whether echo, noise or distance is the problem.</string>
+    <string name="fixes_intro">Try cheap changes before spending money: curtains, switching off fans, moving the speaker or using a microphone. ClearRoom predicts how much each one helps.</string>
+    <string name="log_intro">Leave the phone in the room to see how background noise changes through the day. Only sound levels are kept, never audio.</string>
+
+    <!-- Microphone permission -->
+    <string name="mic_why">ClearRoom needs the microphone to measure sound levels. It never records or stores speech.</string>
+    <string name="mic_denied_can_ask_again">Without the microphone, ClearRoom can\'t measure the room. It only measures sound levels, never speech.</string>
+    <string name="mic_denied_permanently">Microphone access is turned off for ClearRoom. Turn it on in Settings, under Permissions.</string>
+    <string name="mic_ready">Microphone ready. Clap tests and noise checks arrive in the next build.</string>
+    <string name="mic_allow">Allow microphone</string>
+    <string name="mic_open_settings">Open settings</string>
 </resources>
