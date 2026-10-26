@@ -1,10 +1,13 @@
 package com.clearroom.app
 
+import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.FieldProblem
 import com.clearroom.app.data.RoomField
+import com.clearroom.app.data.RtTake
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
@@ -343,6 +346,39 @@ class AppViewModelTest {
         assertEquals(emptyList(), seat.rtTakes)
         assertEquals(aMeasuredSeat(1, 1).noise, seat.noise)
         assertEquals(MeasurePhase.Idle, vm.phase())
+    }
+
+    // --- Clarity verdict (M6) ----------------------------------------------------------------
+
+    @Test
+    fun `with no room open there is no verdict`() = runTest {
+        val vm = startApp()
+        assertNull(vm.clarity.value)
+    }
+
+    @Test
+    fun `the sample room's verdict has the back row below the front row`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        runCurrent()
+        val room = assertIs<ClarityResult.Ready>(vm.clarity.value).room
+        assertTrue(room.backRowSti < room.frontRowSti, "front ${room.frontRowSti}, back ${room.backRowSti}")
+    }
+
+    @Test
+    fun `a room still missing measurements says which`() = runTest {
+        val vm = startWithRoom(SeatMeasure(0, 0, rtTakes = listOf(RtTake(List(7) { 1.0 }))))
+        runCurrent()
+        assertEquals(ClarityResult.NeedsMore(setOf(MissingInput.NOISE)), vm.clarity.value)
+    }
+
+    @Test
+    fun `the verdict appears as soon as the last missing measurement is saved`() = runTest {
+        val vm = startWithRoom(SeatMeasure(0, 0, rtTakes = listOf(RtTake(List(7) { 1.0 }))))
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceUntilIdle()
+        assertIs<ClarityResult.Ready>(vm.clarity.value)
     }
 
     @Test

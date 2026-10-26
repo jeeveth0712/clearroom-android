@@ -236,7 +236,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 - [x] **M5 — Echo analysis.** RT60 per band from a clap, Schroeder curve, quality messages ("clap louder", "too noisy", "clipped"), 3 takes per seat. *(Done Oct 26: 201 laptop + 58 phone tests pass. 160 synthetic claps show no bias in any band; the 3-clap seat result meets NFR-3 in 250 Hz–4 kHz and 8 kHz. Clap countdown 3 s by default, 10 s optional. Waiting on your real-clap check.)*
   *Skills:* acoustics-dsp, clearroom-testing.
   *Done when:* unit tests on synthetic claps meet NFR-3 (±10 % or ±0.1 s), and a real clap in a normal room gives RT60 between 0.3 and 2 s.
-- [ ] **M6 — Clarity engine.** STI, Sabine fit, speech level vs distance, limiting cause, what-if, required voice level.
+- [x] **M6 — Clarity engine.** STI, Sabine fit, speech level vs distance, limiting cause, what-if, required voice level. *(Done Oct 26: 254 laptop tests pass, including all 15 golden STI values from the independent reference and 4 new direct-sound ones. Sample room: front row 0.59, back row 0.58, fair, limited by echo; 20 m² of curtains lifts the back row to 0.65. Phone UI tests to rerun once the phone is unlocked. Cause rule awaiting your confirmation.)*
   *Skills:* sti-room-model, clearroom-testing.
   *Done when:* the golden STI tests pass within ±0.02 (NFR-4), and the sample room's back row scores below its front row.
 - [ ] **M7 — 3D core.** `Scene3D` (camera, projection, drag to rotate, pinch to zoom, shading) and V8, the 3D clarity room.

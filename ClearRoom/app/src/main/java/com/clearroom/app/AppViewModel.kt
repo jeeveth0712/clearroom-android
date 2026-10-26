@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.clearroom.app.acoustics.ClarityModel
+import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
@@ -32,8 +34,13 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.IOException
@@ -56,6 +63,17 @@ class AppViewModel(
 
     /** Separate from [state] so 20 level updates a second redraw only the level bar. */
     val liveLevelDb: StateFlow<Double> = audio.liveLevelDb
+
+    /**
+     * The clarity engine's verdict for the working room (FR-6, FR-7), recomputed off the main
+     * thread whenever its measurements change; null while no room is open.
+     */
+    val clarity: StateFlow<ClarityResult?> = state
+        .map { it.session }
+        .distinctUntilChanged()
+        .map { session -> session?.let { ClarityModel.evaluate(it) } }
+        .flowOn(dsp)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     private val runner = MeasurementRunner(audio, dsp)
     private var measurement: Job? = null

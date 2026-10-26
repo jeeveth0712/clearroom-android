@@ -1,6 +1,7 @@
 package com.clearroom.app.acoustics
 
 import com.clearroom.app.data.Room
+import com.clearroom.app.data.SeatId
 import kotlin.math.hypot
 
 /** A point on the floor plan in metres: x across the room (0 = left wall), y from the front wall. */
@@ -25,15 +26,20 @@ object SeatLayout {
 
     fun seats(room: Room): List<Seat> {
         val speaker = speaker(room)
-        val lastRowM = room.lengthM - BACK_MARGIN_M
         return (0 until room.rows).flatMap { row ->
-            val yM = spread(FIRST_ROW_M, lastRowM, row, room.rows, singleAt = FIRST_ROW_M)
             (0 until room.cols).map { col ->
-                val xM = spread(SIDE_MARGIN_M, room.widthM - SIDE_MARGIN_M, col, room.cols, singleAt = room.widthM / 2)
-                val position = FloorPoint(xM, yM)
+                val position = position(room, SeatId(row, col))
                 Seat(row, col, position, position.distanceTo(speaker))
             }
         }
+    }
+
+    /** Where one seat is on the floor plan. */
+    fun position(room: Room, seat: SeatId): FloorPoint {
+        require(seat.row < room.rows && seat.col < room.cols) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
+        val yM = spread(FIRST_ROW_M, room.lengthM - BACK_MARGIN_M, seat.row, room.rows, singleAt = FIRST_ROW_M)
+        val xM = spread(SIDE_MARGIN_M, room.widthM - SIDE_MARGIN_M, seat.col, room.cols, singleAt = room.widthM / 2)
+        return FloorPoint(xM, yM)
     }
 
     private fun spread(start: Double, end: Double, index: Int, count: Int, singleAt: Double): Double =

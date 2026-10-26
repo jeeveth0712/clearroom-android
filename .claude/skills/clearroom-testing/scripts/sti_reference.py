@@ -8,6 +8,11 @@ Usage:
     python sti_reference.py                 # print the golden table
     python sti_reference.py --t60 0.8 --snr 10
     python sti_reference.py --t60 0.5,0.6,0.7,0.8,0.8,0.7,0.6 --snr 20,18,15,12,10,8,6
+    python sti_reference.py --t60 1.0 --snr inf --direct 0.5   # direct-to-reverberant energy ratio
+
+--direct adds the direct sound (Houtgast & Steeneken): the reverberant modulation transfer
+1/(1 + jx), x = 2*pi*F*T/13.8, is summed with the unsmeared direct part d and normalised by (d + 1).
+d = 0 (the default) is exactly the requirements doc's formula.
 """
 import argparse
 import math
@@ -20,8 +25,9 @@ BETA = [0.085, 0.078, 0.065, 0.011, 0.047, 0.095]
 SNR_APP_LIMIT_DB = 15.0
 
 
-def modulation_index(f_mod, t60_s, snr_db):
-    reverb = 1.0 / math.sqrt(1.0 + (2 * math.pi * f_mod * t60_s / 13.8) ** 2)
+def modulation_index(f_mod, t60_s, snr_db, direct=0.0):
+    x = 2 * math.pi * f_mod * t60_s / 13.8
+    reverb = abs(direct + 1 / (1 + 1j * x)) / (direct + 1)  # complex sum, written independently of the Kotlin
     noise = 1.0 if math.isinf(snr_db) and snr_db > 0 else 1.0 / (1.0 + 10 ** (-snr_db / 10))
     return reverb * noise
 
@@ -37,13 +43,14 @@ def transmission_index(m):
     return (snr_app + SNR_APP_LIMIT_DB) / (2 * SNR_APP_LIMIT_DB)
 
 
-def band_mti(t60_s, snr_db):
-    tis = [transmission_index(modulation_index(f, t60_s, snr_db)) for f in MOD_FREQS_HZ]
+def band_mti(t60_s, snr_db, direct=0.0):
+    tis = [transmission_index(modulation_index(f, t60_s, snr_db, direct)) for f in MOD_FREQS_HZ]
     return sum(tis) / len(tis)
 
 
-def sti(t60_per_band, snr_per_band):
-    mti = [band_mti(t, s) for t, s in zip(t60_per_band, snr_per_band)]
+def sti(t60_per_band, snr_per_band, direct_per_band=None):
+    direct_per_band = direct_per_band or [0.0] * 7
+    mti = [band_mti(t, s, d) for t, s, d in zip(t60_per_band, snr_per_band, direct_per_band)]
     value = sum(a * m for a, m in zip(ALPHA, mti))
     value -= sum(b * math.sqrt(mti[k] * mti[k + 1]) for k, b in enumerate(BETA))
     return max(0.0, min(1.0, value)), mti
@@ -82,10 +89,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--t60", help="seconds; one value or 7 comma-separated (125..8k)")
     parser.add_argument("--snr", help="dB; one value, 7 comma-separated, or inf")
+    parser.add_argument("--direct", default="0", help="direct-to-reverberant energy ratio; one value or 7")
     args = parser.parse_args()
 
     if args.t60 is not None and args.snr is not None:
-        value, mti = sti(parse_list(args.t60, "t60"), parse_list(args.snr, "snr"))
+        value, mti = sti(parse_list(args.t60, "t60"), parse_list(args.snr, "snr"), parse_list(args.direct, "direct"))
         for band, m in zip(BANDS_HZ, mti):
             print(f"  MTI {band:>5} Hz = {m:.4f}")
         print(f"STI = {value:.4f}")
