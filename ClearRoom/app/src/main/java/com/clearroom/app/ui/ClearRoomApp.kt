@@ -17,6 +17,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.clearroom.app.R
+import com.clearroom.app.ui.screens.FixesScreen
 import com.clearroom.app.ui.screens.MeasureScreen
 import com.clearroom.app.ui.screens.ResultsScreen
 import com.clearroom.app.ui.screens.RoomScreen
@@ -25,12 +26,13 @@ import com.clearroom.app.ui.theme.ClearRoomTheme
 
 /**
  * App shell: bottom navigation over the five tabs. Stateless apart from the selected tab, which
- * survives rotation; data comes in as [state] and [evaluation], and user actions go out through [onEvent].
+ * survives rotation; data comes in as [state], [evaluation] and [fixes], and user actions go out through [onEvent].
  */
 @Composable
 fun ClearRoomApp(
     state: UiState,
     evaluation: Evaluation?,
+    fixes: FixesView?,
     liveLevelDb: () -> Double,
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier,
@@ -45,7 +47,7 @@ fun ClearRoomApp(
             AppTab.ROOM -> RoomScreen(state.room, onEvent, contentModifier)
             AppTab.MEASURE -> MeasureScreen(state.session, state.measure, liveLevelDb, onEvent, contentModifier)
             AppTab.RESULTS -> ResultsScreen(state.session, evaluation, contentModifier)
-            AppTab.FIXES -> TabIntro(AppTab.FIXES.labelRes, R.string.fixes_intro, contentModifier)
+            AppTab.FIXES -> FixesScreen(state.session, state.fixes, fixes, onEvent, contentModifier)
             AppTab.LOG -> TabIntro(AppTab.LOG.labelRes, R.string.log_intro, contentModifier)
         }
     }
@@ -69,5 +71,5 @@ private fun AppNavigationBar(selected: AppTab, onTabSelected: (AppTab) -> Unit) 
 @Preview(showBackground = true)
 @Composable
 private fun ClearRoomAppPreview() {
-    ClearRoomTheme { ClearRoomApp(state = UiState(), evaluation = null, liveLevelDb = { -60.0 }, onEvent = {}) }
+    ClearRoomTheme { ClearRoomApp(state = UiState(), evaluation = null, fixes = null, liveLevelDb = { -60.0 }, onEvent = {}) }
 }

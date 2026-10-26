@@ -72,7 +72,10 @@ data class RoomClarity(
     fun at(seat: SeatId): SeatClarity = seats.first { it.seat == seat }
 
     /** A row is as clear as its worst seat: the goal is that every seat can follow. */
-    fun rowSti(row: Int): Double = seats.filter { it.seat.row == row }.minOf { it.sti }
+    fun rowSti(row: Int): Double = worstSeat(row).sti
+
+    /** The least clear seat in [row]: the one a row is judged by. */
+    fun worstSeat(row: Int): SeatClarity = seats.filter { it.seat.row == row }.minBy { it.sti }
 
     val frontRowSti: Double get() = rowSti(0)
     val backRowSti: Double get() = rowSti(rows - 1)

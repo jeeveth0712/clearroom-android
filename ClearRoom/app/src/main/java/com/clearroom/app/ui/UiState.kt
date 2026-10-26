@@ -3,6 +3,9 @@ package com.clearroom.app.ui
 import com.clearroom.app.acoustics.ClarityGrid
 import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FixSettings
+import com.clearroom.app.acoustics.Fixes
+import com.clearroom.app.acoustics.FixesOutcome
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
@@ -21,6 +24,8 @@ data class UiState(
     val session: Session? = null,
     val room: RoomUiState = RoomUiState(),
     val measure: MeasureUiState = MeasureUiState(),
+    /** The Fixes tab's what-if controls; back to "as measured" whenever another room is opened. */
+    val fixes: FixSettings = FixSettings(),
 )
 
 /**
@@ -37,6 +42,14 @@ data class Evaluation(
     companion object {
         /** Everything the Results tab needs for [session]. Does the maths: call it off the main thread. */
         fun of(session: Session) = Evaluation(session, ClarityModel.evaluate(session), ClarityModel.floorGrid(session))
+    }
+}
+
+/** The Fixes tab's result with the session and settings it was worked out from (like [Evaluation]). */
+data class FixesView(val session: Session, val settings: FixSettings, val outcome: FixesOutcome?) {
+    companion object {
+        /** Does the maths: call it off the main thread. */
+        fun of(session: Session, settings: FixSettings) = FixesView(session, settings, Fixes.outcome(session, settings))
     }
 }
 
@@ -105,4 +118,7 @@ sealed interface UiEvent {
     data object LoadSampleRoom : UiEvent
     data class OpenRoom(val roomId: String) : UiEvent
     data class DeleteRoom(val roomId: String) : UiEvent
+
+    data class FixesChanged(val settings: FixSettings) : UiEvent
+    data object ResetFixes : UiEvent
 }

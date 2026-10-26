@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
@@ -23,6 +24,7 @@ import com.clearroom.app.measure.MeasureOutcome
 import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.measure.bandLevelsOf
 import com.clearroom.app.ui.Evaluation
+import com.clearroom.app.ui.FixesView
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.RoomNotice
@@ -36,6 +38,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -74,6 +77,18 @@ class AppViewModel(
         .flowOn(dsp)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    /**
+     * The Fixes tab (FR-8, FR-11, V6, V7, V12), recomputed off the main thread as the sliders move.
+     * conflate() skips settings that went by while the last ones were still being worked out.
+     */
+    val fixes: StateFlow<FixesView?> = state
+        .map { it.session to it.fixes }
+        .distinctUntilChanged()
+        .conflate()
+        .map { (session, settings) -> session?.let { FixesView.of(it, settings) } }
+        .flowOn(dsp)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
     private val runner = MeasurementRunner(audio, dsp)
     private var measurement: Job? = null
 
@@ -102,6 +117,8 @@ class AppViewModel(
             UiEvent.LoadSampleRoom -> loadSampleRoom()
             is UiEvent.OpenRoom -> viewModelScope.launch { openRoom(event.roomId) }
             is UiEvent.DeleteRoom -> viewModelScope.launch { deleteRoom(event.roomId) }
+            is UiEvent.FixesChanged -> _state.update { it.copy(fixes = event.settings) }
+            UiEvent.ResetFixes -> _state.update { it.copy(fixes = FixSettings()) }
         }
     }
 
@@ -256,7 +273,7 @@ class AppViewModel(
     }
 
     private fun newRoom() {
-        _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null)) }
+        _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null), fixes = FixSettings()) }
     }
 
     private fun loadSampleRoom() = showSession(SampleData.session, notice = RoomNotice.SAMPLE_LOADED)
@@ -283,6 +300,7 @@ class AppViewModel(
                 ),
                 // A seat choice carries over only within the same room, and only if the seat still exists.
                 measure = it.measure.copy(selectedSeat = it.measure.selectedSeat?.takeIf { seat -> sameRoom && session.contains(seat) }),
+                fixes = if (sameRoom) it.fixes else FixSettings(),
             )
         }
     }

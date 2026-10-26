@@ -29,7 +29,7 @@ class ClearRoomAppTest {
 
     @Before
     fun showApp() {
-        compose.setContent { ClearRoomTheme { ClearRoomApp(state = UiState(), evaluation = null, liveLevelDb = { -60.0 }, onEvent = {}) } }
+        compose.setContent { ClearRoomTheme { ClearRoomApp(state = UiState(), evaluation = null, fixes = null, liveLevelDb = { -60.0 }, onEvent = {}) } }
     }
 
     @Test

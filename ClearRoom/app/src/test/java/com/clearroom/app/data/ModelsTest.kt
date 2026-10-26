@@ -222,4 +222,9 @@ class ModelsTest {
         val session = Session(aRoom()).withClap(seat, RtTake(List(7) { 0.8 }), curves).withoutClaps(seat)
         assertEquals(null, assertNotNullSeat(session, seat).lastClap)
     }
+
+    @Test
+    fun `wall area counts the four walls only`() {
+        assertEquals(2 * (9.0 + 7.0) * 3.0, aRoom(lengthM = 9.0, widthM = 7.0, heightM = 3.0).wallAreaM2, 1e-12)
+    }
 }

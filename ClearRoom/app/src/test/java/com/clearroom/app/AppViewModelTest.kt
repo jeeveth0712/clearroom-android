@@ -1,5 +1,6 @@
 package com.clearroom.app
 
+import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.audio.CaptureProblem
@@ -576,5 +577,51 @@ class AppViewModelTest {
         assertNull(vm.state.value.room.editingId)
         assertEquals("", vm.state.value.room.form.name)
         assertEquals(listOf("r1"), vm.state.value.room.saved.map { it.id })
+    }
+
+    // --- Fixes tab (M9) -----------------------------------------------------------------------
+
+    @Test
+    fun `moving a fix control updates the settings and the predicted room`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        runCurrent()
+        assertTrue(assertNotNull(vm.fixes.value).settings.isAsMeasured)
+        vm.onEvent(UiEvent.FixesChanged(FixSettings(curtainM2 = 40.0)))
+        runCurrent()
+        assertEquals(40.0, vm.state.value.fixes.curtainM2)
+        val view = assertNotNull(vm.fixes.value)
+        assertEquals(FixSettings(curtainM2 = 40.0), view.settings)
+        val outcome = assertNotNull(view.outcome)
+        assertTrue(outcome.after.backRowSti > outcome.now.backRowSti)
+    }
+
+    @Test
+    fun `reset puts every fix back to as measured`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.FixesChanged(FixSettings(microphone = true)))
+        vm.onEvent(UiEvent.ResetFixes)
+        runCurrent()
+        assertEquals(FixSettings(), vm.state.value.fixes)
+    }
+
+    @Test
+    fun `opening another room starts its fixes from as measured`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.FixesChanged(FixSettings(curtainM2 = 20.0)))
+        vm.onEvent(UiEvent.OpenRoom("r1"))
+        runCurrent()
+        assertEquals(FixSettings(), vm.state.value.fixes)
+        vm.onEvent(UiEvent.FixesChanged(FixSettings(curtainM2 = 20.0)))
+        vm.onEvent(UiEvent.NewRoom)
+        assertEquals(FixSettings(), vm.state.value.fixes)
+    }
+
+    @Test
+    fun `with no room open there are no fixes to show`() = runTest {
+        val vm = startApp()
+        assertNull(vm.fixes.value)
     }
 }

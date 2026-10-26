@@ -51,6 +51,9 @@ data class Room(
     /** Floor, ceiling and four walls; Sabine's equation needs it (doc Analysis step 2). */
     val surfaceAreaM2: Double get() = 2 * (lengthM * widthM + lengthM * heightM + widthM * heightM)
 
+    /** The four walls only (where curtains can hang), m². */
+    val wallAreaM2: Double get() = 2 * (lengthM + widthM) * heightM
+
     val seatCount: Int get() = rows * cols
 }
 

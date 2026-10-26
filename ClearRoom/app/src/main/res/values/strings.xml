@@ -261,6 +261,58 @@
     <string name="results_distance_caption_masked">The voice (line) gets quieter away from the speaker and levels off beyond about %1$s m, where echo takes over. At the back it is only %2$d dB above the noise; about 15 dB is needed for easy listening.</string>
     <string name="results_distance_caption_ok">The voice (line) gets quieter away from the speaker and levels off beyond about %1$s m, where echo takes over. At the back it is still %2$d dB above the noise, enough for easy listening.</string>
 
+    <!-- Fixes tab (FR-8, FR-11, V6, V7, V12) -->
+    <string name="fixes_needs_measurements">Measure the echo (a clap test) and the background noise on the Measure tab first. Then try changes here before spending money.</string>
+    <string name="fixes_summary_title">With these changes</string>
+    <!-- %1$s and %2$s are band phrases such as "tiring to follow" -->
+    <string name="fixes_summary_back">Back rows: %1$s → %2$s</string>
+    <string name="fixes_summary_now">Now: %1$s</string>
+    <string name="fixes_summary_back_now">Back rows now: %1$s</string>
+    <string name="fixes_summary_echo_now">Echo time at speech pitches: %1$s s</string>
+    <string name="fixes_summary_echo">Echo time at speech pitches: %1$s s → %2$s s</string>
+    <string name="fixes_summary_hint">Move a slider or switch below to try a change.</string>
+    <string name="fixes_morph_title">The room with your changes</string>
+    <string name="fixes_morph_caption">The bars move to the scores with your changes; watch seats rise out of the red. The cone is the speaker.</string>
+    <string name="fixes_morph_description">3D view of the room with the changes. Front row: %1$s. Back row: %2$s.</string>
+    <string name="fixes_controls_title">Try a change</string>
+    <string name="fixes_curtains">Heavy curtains hung (m²): %1$d</string>
+    <string name="fixes_students">Students in the room: %1$d</string>
+    <string name="fixes_fans_off">Turn the fans and AC off</string>
+    <string name="fixes_fans_already_off">The fans were already off when the noise was measured.</string>
+    <string name="fixes_microphone">Use a portable microphone (about 10 dB louder at every seat)</string>
+    <!-- %1$s is a voice effort word, %2$s the change in dB, e.g. "+6" -->
+    <string name="fixes_voice">Speaker’s voice: %1$s (%2$s dB)</string>
+    <string name="fixes_speaker">Speaker stands this far from the front wall (m): %1$s</string>
+    <string name="fixes_reset">Back to as measured</string>
+    <string name="effort_quieter">quieter</string>
+    <string name="effort_normal">normal</string>
+    <string name="effort_raised">raised</string>
+    <string name="effort_loud">loud</string>
+    <string name="fixes_ranking_title">Best single changes for the back row</string>
+    <!-- %1$s is the change in score, e.g. "+0.08", %2$s the cost class -->
+    <string name="fixes_ranking_value">%1$s · %2$s</string>
+    <string name="fixes_ranking_best">Best: %1$s (%2$s)</string>
+    <string name="fixes_ranking_echo_note">Echo is what limits the back row here, so a louder voice, a microphone or standing closer barely helps: they make the voice louder, not the echo shorter.</string>
+    <string name="fixes_ranking_caption">Each bar shows how much one change on its own lifts the back row’s score (0 to 1); whiskers show the uncertainty. Costs are rough guides.</string>
+    <string name="fix_curtains">Hang 20 m² of heavy curtains</string>
+    <string name="fix_fans_off">Switch the fans and AC off</string>
+    <string name="fix_microphone">Use a portable microphone</string>
+    <string name="fix_speaker_closer">Teach 2 m closer to the class</string>
+    <string name="fix_raised_voice">Speak with a raised voice</string>
+    <string name="cost_free">free</string>
+    <string name="cost_low">low cost</string>
+    <string name="cost_medium">medium cost</string>
+    <string name="fixes_voice_title">How loud the speaker must be</string>
+    <string name="fixes_voice_normal">normal</string>
+    <string name="fixes_voice_raised">raised</string>
+    <string name="fixes_voice_loud">loud</string>
+    <string name="fixes_voice_normal_enough">A normal voice is enough for every row to follow easily.</string>
+    <string name="fixes_voice_needs_raised">The back row needs a raised voice, about %1$d dB above normal.</string>
+    <string name="fixes_voice_needs_loud">The back row needs a loud voice, about %1$d dB above normal: tiring for a whole lesson. A microphone helps.</string>
+    <string name="fixes_voice_beyond_loud">The back row needs more than a loud voice, %1$d dB above normal. Use a microphone.</string>
+    <string name="fixes_voice_unreachable">The echo sets a ceiling at the back that no voice or microphone can pass. Curtains or other soft surfaces are needed.</string>
+    <string name="fixes_voice_uncalibrated">This assumes a typical 60 dBA voice (uncalibrated); record the voice on the Measure tab for your own.</string>
+
     <!-- Chart axes and legends -->
     <string name="chart_pitch_hz">Pitch (Hz)</string>
     <string name="chart_echo_time_s">Echo time (s)</string>
@@ -275,6 +327,8 @@
     <string name="chart_noise">Noise</string>
     <string name="chart_masked_zone">Less than 15 dB above noise</string>
     <string name="chart_seconds">%1$d s</string>
+    <string name="chart_row">Row (1 = front)</string>
+    <string name="chart_voice_needed_db">Voice needed (dB above normal)</string>
 
     <!-- Band levels table -->
     <string name="levels_caption">dB relative to the phone\'s maximum. Only differences between readings matter.</string>

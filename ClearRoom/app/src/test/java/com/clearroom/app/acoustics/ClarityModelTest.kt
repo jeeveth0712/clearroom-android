@@ -260,4 +260,13 @@ class ClarityModelTest {
         assertFailsWith<IllegalArgumentException> { ClarityGrid(1.0, 1.0, 0, 1, emptyList()) }
         assertFailsWith<IllegalArgumentException> { ClarityGrid(1.0, 1.0, 1, 1, listOf(0.5, 0.5, 0.5)) }
     }
+
+    @Test
+    fun `a row's worst seat is its least clear one`() {
+        val room = ready(sample)
+        val worst = room.worstSeat(4)
+        assertEquals(4, worst.seat.row)
+        assertEquals(room.seats.filter { it.seat.row == 4 }.minOf { it.sti }, worst.sti)
+        assertEquals(worst.sti, room.backRowSti)
+    }
 }
