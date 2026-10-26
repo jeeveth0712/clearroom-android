@@ -58,6 +58,44 @@ class SeatLayoutTest {
         assertTrue(centreColumn.zipWithNext().all { (front, back) -> back > front }, "$centreColumn")
     }
 
+    // --- How many seats fit -----------------------------------------------------------------------
+
+    @Test
+    fun `a 3,5 by 2,5 m room has space for 1 row of 2 seats`() {
+        // Rows run from 2.5 m to 2.7 m (0.2 m of depth); seats span 0.8 m to 1.7 m across (0.9 m).
+        assertEquals(1, SeatLayout.maxRows(3.5))
+        assertEquals(2, SeatLayout.maxCols(2.5))
+    }
+
+    @Test
+    fun `the sample-sized room has space for far more than its 5 by 6 seats`() {
+        assertEquals(12, SeatLayout.maxRows(9.0)) // 5.7 m of rows, 0.5 m apart
+        assertEquals(11, SeatLayout.maxCols(7.0)) // 5.4 m across
+    }
+
+    @Test
+    fun `seats exactly 0,5 m apart still fit`() {
+        assertEquals(2, SeatLayout.maxRows(3.8)) // 0.5 m of depth: 2 rows
+        assertEquals(3, SeatLayout.maxCols(2.6)) // 1.0 m across: 3 seats
+    }
+
+    @Test
+    fun `a room too short for the usual first row still fits one row`() {
+        assertEquals(1, SeatLayout.maxRows(2.0))
+    }
+
+    @Test
+    fun `spacing is the gap to the nearest neighbour, across or front-to-back`() {
+        assertEquals(1.08, SeatLayout.spacingM(room), 1e-12) // across: 5.4 m / 5; front-to-back is 1.425 m
+        assertEquals(0.05, SeatLayout.spacingM(aRoom(lengthM = 3.5, widthM = 2.5, rows = 5, cols = 6)), 1e-12)
+    }
+
+    @Test
+    fun `a single seat has no neighbour`() {
+        assertEquals(Double.POSITIVE_INFINITY, SeatLayout.spacingM(aRoom(rows = 1, cols = 1)))
+        assertEquals(1.425, SeatLayout.spacingM(aRoom(lengthM = 9.0, rows = 5, cols = 1)), 1e-12)
+    }
+
     @Test
     fun `floor distance is symmetric`() {
         val a = FloorPoint(1.0, 2.0)

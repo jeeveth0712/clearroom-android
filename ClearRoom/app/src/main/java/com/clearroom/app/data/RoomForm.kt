@@ -1,5 +1,7 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.acoustics.SeatLayout
+
 /**
  * Accepted ranges for the Room form. The doc's seat layout needs length ≥ 3.3 m (seats run from
  * 2.5 m to length − 0.8 m) and width ≥ 1.6 m (0.8 m side margins); the upper limits catch typos
@@ -17,7 +19,8 @@ object RoomLimits {
 
 enum class RoomField { NAME, LENGTH, WIDTH, HEIGHT, ROWS, COLS, STUDENTS }
 
-enum class FieldProblem { MISSING, NOT_A_NUMBER, OUT_OF_RANGE }
+/** [DOESNT_FIT]: more rows or seats per row than the room's length or width has space for. */
+enum class FieldProblem { MISSING, NOT_A_NUMBER, OUT_OF_RANGE, DOESNT_FIT }
 
 /** The Room form as typed: text fields stay text until Save, so half-typed input like "7." is fine. */
 data class RoomForm(
@@ -50,6 +53,8 @@ data class RoomForm(
         val rowCount = whole(RoomField.ROWS, rows, RoomLimits.ROWS, problems)
         val colCount = whole(RoomField.COLS, cols, RoomLimits.COLS, problems)
         val studentCount = whole(RoomField.STUDENTS, students, RoomLimits.STUDENTS, problems)
+        checkFits(RoomField.ROWS, rowCount, rowsThatFit(), problems)
+        checkFits(RoomField.COLS, colCount, seatsPerRowThatFit(), problems)
 
         if (problems.isNotEmpty()) return Result.Invalid(problems)
         return Result.Valid(
@@ -66,6 +71,12 @@ data class RoomForm(
             ),
         )
     }
+
+    /** How many rows the typed length has space for; null while the length isn't a valid number. */
+    fun rowsThatFit(): Int? = validDecimal(lengthM, RoomLimits.LENGTH_M)?.let(SeatLayout::maxRows)
+
+    /** How many seats per row the typed width has space for; null while the width isn't a valid number. */
+    fun seatsPerRowThatFit(): Int? = validDecimal(widthM, RoomLimits.WIDTH_M)?.let(SeatLayout::maxCols)
 
     companion object {
         fun from(room: Room) = RoomForm(
@@ -86,18 +97,25 @@ data class RoomForm(
             if (this % 1.0 == 0.0) toLong().toString() else toString()
 
         /** Accepts "7.5" and "7,5": many phones offer a comma on the decimal keyboard. */
+        private fun parseDecimal(text: String): Double? = text.trim().replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() }
+
+        private fun validDecimal(text: String, range: ClosedFloatingPointRange<Double>): Double? = parseDecimal(text)?.takeIf { it in range }
+
         private fun decimal(
             field: RoomField,
             text: String,
             range: ClosedFloatingPointRange<Double>,
             problems: MutableMap<RoomField, FieldProblem>,
         ): Double? {
-            val trimmed = text.trim().replace(',', '.')
-            if (trimmed.isEmpty()) return null.also { problems[field] = FieldProblem.MISSING }
-            val value = trimmed.toDoubleOrNull()?.takeIf { it.isFinite() }
-                ?: return null.also { problems[field] = FieldProblem.NOT_A_NUMBER }
+            if (text.isBlank()) return null.also { problems[field] = FieldProblem.MISSING }
+            val value = parseDecimal(text) ?: return null.also { problems[field] = FieldProblem.NOT_A_NUMBER }
             if (value !in range) problems[field] = FieldProblem.OUT_OF_RANGE
             return value
+        }
+
+        /** Only checked once the count itself is fine; [fits] is null while the size isn't. */
+        private fun checkFits(field: RoomField, count: Int?, fits: Int?, problems: MutableMap<RoomField, FieldProblem>) {
+            if (count != null && fits != null && field !in problems && count > fits) problems[field] = FieldProblem.DOESNT_FIT
         }
 
         private fun whole(

@@ -67,9 +67,22 @@ class ClarityRoomSceneTest {
     fun `bars are as wide as set and stay inside the room`() {
         bars.forEach { faces ->
             val points = faces.flatMap { it.points }
-            assertEquals(ClarityRoomScene.BAR_WIDTH_M, points.maxOf { it.x } - points.minOf { it.x }, 1e-9)
+            assertEquals(ClarityRoomScene.MAX_BAR_WIDTH_M, points.maxOf { it.x } - points.minOf { it.x }, 1e-9)
             assertTrue(points.all { it.x in 0.0..room.widthM && it.z in 0.0..room.lengthM && it.y <= room.heightM })
         }
+    }
+
+    @Test
+    fun `in a roomy layout bars are full width`() {
+        assertEquals(0.45, ClarityRoomScene.barWidthM(room), 1e-12)
+        assertEquals(0.45, ClarityRoomScene.barWidthM(room.copy(rows = 1, cols = 1)), 1e-12)
+    }
+
+    @Test
+    fun `where seats are close together bars narrow so they never merge`() {
+        val cramped = room.copy(lengthM = 3.5, widthM = 2.5) // 5 x 6 seats only 5 cm apart front-to-back
+        assertEquals(0.04, ClarityRoomScene.barWidthM(cramped), 1e-12)
+        assertTrue(ClarityRoomScene.barWidthM(cramped) < SeatLayout.spacingM(cramped))
     }
 
     @Test

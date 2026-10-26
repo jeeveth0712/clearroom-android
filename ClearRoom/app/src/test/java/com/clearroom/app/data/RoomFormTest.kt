@@ -65,8 +65,8 @@ class RoomFormTest {
     @Test
     fun `range limits are inclusive and anything beyond them is refused`() {
         fun valid(form: RoomForm) = assertIs<RoomForm.Result.Valid>(form.toRoom("id"))
-        valid(aValidForm().copy(lengthM = "3.5", widthM = "2", heightM = "20", rows = "1", cols = "30", students = "500"))
-        valid(aValidForm().copy(lengthM = "60", widthM = "60", heightM = "2", rows = "30", cols = "1", students = "0"))
+        valid(aValidForm().copy(lengthM = "3.5", widthM = "60", heightM = "20", rows = "1", cols = "30", students = "500"))
+        valid(aValidForm().copy(lengthM = "60", widthM = "2", heightM = "2", rows = "30", cols = "1", students = "0"))
 
         val beyond = aValidForm().copy(lengthM = "3.49", widthM = "60.01", heightM = "1.9", rows = "0", cols = "31", students = "-1")
         assertEquals(
@@ -80,6 +80,33 @@ class RoomFormTest {
             ),
             problemsOf(beyond),
         )
+    }
+
+    @Test
+    fun `more rows or seats than the room has space for are refused`() {
+        val cramped = aValidForm().copy(lengthM = "3.5", widthM = "2.5", rows = "5", cols = "6")
+        assertEquals(mapOf(RoomField.ROWS to FieldProblem.DOESNT_FIT, RoomField.COLS to FieldProblem.DOESNT_FIT), problemsOf(cramped))
+        assertIs<RoomForm.Result.Valid>(cramped.copy(rows = "1", cols = "2").toRoom("id"))
+    }
+
+    @Test
+    fun `the form says how many rows and seats per row fit`() {
+        val form = aValidForm().copy(lengthM = "3,5", widthM = "2.5")
+        assertEquals(1, form.rowsThatFit())
+        assertEquals(2, form.seatsPerRowThatFit())
+    }
+
+    @Test
+    fun `nothing is said to fit while the size isn't a valid number`() {
+        assertEquals(null, aValidForm().copy(lengthM = "").rowsThatFit())
+        assertEquals(null, aValidForm().copy(widthM = "wide").seatsPerRowThatFit())
+        assertEquals(null, aValidForm().copy(lengthM = "600").rowsThatFit())
+    }
+
+    @Test
+    fun `a size problem is reported on the size, not as seats that don't fit`() {
+        val problems = problemsOf(aValidForm().copy(lengthM = "1", rows = "30"))
+        assertEquals(mapOf(RoomField.LENGTH to FieldProblem.OUT_OF_RANGE), problems)
     }
 
     @Test

@@ -85,6 +85,17 @@ class RoomScreenTest {
     }
 
     @Test
+    fun seatsThatDontFit_sayHowManyDo() {
+        val cramped = sampleForm.copy(lengthM = "3.5", widthM = "2.5")
+        show(RoomUiState(form = cramped, problems = mapOf(RoomField.ROWS to FieldProblem.DOESNT_FIT, RoomField.COLS to FieldProblem.DOESNT_FIT)))
+        val rows = InstrumentationRegistry.getInstrumentation().targetContext.resources.getQuantityString(R.plurals.room_problem_rows_dont_fit, 1, 1)
+        val seats = InstrumentationRegistry.getInstrumentation().targetContext.resources.getQuantityString(R.plurals.room_problem_seats_dont_fit, 2, 2)
+        scrollTo(rows)
+        compose.onNodeWithText(rows).assertIsDisplayed()
+        compose.onNodeWithText(seats).assertIsDisplayed()
+    }
+
+    @Test
     fun newRoomAndSampleButtons_sendTheirEvents() {
         show(RoomUiState())
         compose.onNodeWithText(text(R.string.room_new)).performClick()

@@ -33,6 +33,15 @@
     <string name="room_problem_missing">Required</string>
     <string name="room_problem_not_a_number">Enter a number</string>
     <string name="room_problem_range">Between %1$s and %2$s</string>
+    <plurals name="room_problem_rows_dont_fit">
+        <item quantity="one">Only %d row fits in this length</item>
+        <item quantity="other">Only %d rows fit in this length</item>
+    </plurals>
+    <plurals name="room_problem_seats_dont_fit">
+        <item quantity="one">Only %d seat fits across this width</item>
+        <item quantity="other">Only %d seats fit across this width</item>
+    </plurals>
+    <string name="room_problem_doesnt_fit">Too many for this room\'s size</string>
     <plurals name="room_problem_name_too_long">
         <item quantity="one">At most %d character</item>
         <item quantity="other">At most %d characters</item>

@@ -98,30 +98,33 @@ fun RoomScreen(state: RoomUiState, onEvent: (UiEvent) -> Unit, modifier: Modifie
 private fun RoomFormCard(state: RoomUiState, onEvent: (UiEvent) -> Unit) {
     val form = state.form
     val change = { updated: RoomForm -> onEvent(UiEvent.RoomFormChanged(updated)) }
+
+    @Composable
+    fun errorFor(field: RoomField): String? = state.problems[field]?.let { problemText(field, it, form) }
     SectionCard(R.string.room_details) {
-        FormField(R.string.room_field_name, form.name, state.problems[RoomField.NAME], RoomField.NAME, KeyboardType.Text) {
+        FormField(R.string.room_field_name, form.name, errorFor(RoomField.NAME), KeyboardType.Text) {
             change(form.copy(name = it))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormField(R.string.room_field_length, form.lengthM, state.problems[RoomField.LENGTH], RoomField.LENGTH, KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_length, form.lengthM, errorFor(RoomField.LENGTH), KeyboardType.Decimal, Modifier.weight(1f)) {
                 change(form.copy(lengthM = it))
             }
-            FormField(R.string.room_field_width, form.widthM, state.problems[RoomField.WIDTH], RoomField.WIDTH, KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_width, form.widthM, errorFor(RoomField.WIDTH), KeyboardType.Decimal, Modifier.weight(1f)) {
                 change(form.copy(widthM = it))
             }
-            FormField(R.string.room_field_height, form.heightM, state.problems[RoomField.HEIGHT], RoomField.HEIGHT, KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_height, form.heightM, errorFor(RoomField.HEIGHT), KeyboardType.Decimal, Modifier.weight(1f)) {
                 change(form.copy(heightM = it))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormField(R.string.room_field_rows, form.rows, state.problems[RoomField.ROWS], RoomField.ROWS, KeyboardType.Number, Modifier.weight(1f)) {
+            FormField(R.string.room_field_rows, form.rows, errorFor(RoomField.ROWS), KeyboardType.Number, Modifier.weight(1f)) {
                 change(form.copy(rows = it))
             }
-            FormField(R.string.room_field_cols, form.cols, state.problems[RoomField.COLS], RoomField.COLS, KeyboardType.Number, Modifier.weight(1f)) {
+            FormField(R.string.room_field_cols, form.cols, errorFor(RoomField.COLS), KeyboardType.Number, Modifier.weight(1f)) {
                 change(form.copy(cols = it))
             }
         }
-        FormField(R.string.room_field_students, form.students, state.problems[RoomField.STUDENTS], RoomField.STUDENTS, KeyboardType.Number) {
+        FormField(R.string.room_field_students, form.students, errorFor(RoomField.STUDENTS), KeyboardType.Number) {
             change(form.copy(students = it))
         }
         MaterialPicker(R.string.room_surface_floor, form.floor) { change(form.copy(floor = it)) }
@@ -136,8 +139,7 @@ private fun RoomFormCard(state: RoomUiState, onEvent: (UiEvent) -> Unit) {
 private fun FormField(
     @StringRes label: Int,
     value: String,
-    problem: FieldProblem?,
-    field: RoomField,
+    error: String?,
     keyboard: KeyboardType,
     modifier: Modifier = Modifier,
     onValueChange: (String) -> Unit,
@@ -148,14 +150,14 @@ private fun FormField(
         modifier = modifier.fillMaxWidth(),
         label = { Text(stringResource(label)) },
         singleLine = true,
-        isError = problem != null,
-        supportingText = problem?.let { { Text(problemText(field, it)) } },
+        isError = error != null,
+        supportingText = error?.let { { Text(it) } },
         keyboardOptions = KeyboardOptions(keyboardType = keyboard, imeAction = ImeAction.Next),
     )
 }
 
 @Composable
-private fun problemText(field: RoomField, problem: FieldProblem): String = when (problem) {
+private fun problemText(field: RoomField, problem: FieldProblem, form: RoomForm): String = when (problem) {
     FieldProblem.MISSING -> stringResource(R.string.room_problem_missing)
     FieldProblem.NOT_A_NUMBER -> stringResource(R.string.room_problem_not_a_number)
     FieldProblem.OUT_OF_RANGE -> when (field) {
@@ -166,6 +168,14 @@ private fun problemText(field: RoomField, problem: FieldProblem): String = when 
         RoomField.ROWS -> rangeText(RoomLimits.ROWS.first.toString(), RoomLimits.ROWS.last.toString())
         RoomField.COLS -> rangeText(RoomLimits.COLS.first.toString(), RoomLimits.COLS.last.toString())
         RoomField.STUDENTS -> rangeText(RoomLimits.STUDENTS.first.toString(), RoomLimits.STUDENTS.last.toString())
+    }
+    FieldProblem.DOESNT_FIT -> {
+        val fits = when (field) {
+            RoomField.ROWS -> form.rowsThatFit()?.let { pluralStringResource(R.plurals.room_problem_rows_dont_fit, it, it) }
+            RoomField.COLS -> form.seatsPerRowThatFit()?.let { pluralStringResource(R.plurals.room_problem_seats_dont_fit, it, it) }
+            else -> null
+        }
+        fits ?: stringResource(R.string.room_problem_doesnt_fit)
     }
 }
 
