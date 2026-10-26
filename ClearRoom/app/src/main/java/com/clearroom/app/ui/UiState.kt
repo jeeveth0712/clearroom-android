@@ -1,5 +1,7 @@
 package com.clearroom.app.ui
 
+import com.clearroom.app.acoustics.ClarityGrid
+import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
@@ -26,7 +28,17 @@ data class UiState(
  * thread, so for a moment after switching rooms it can still describe the previous one: keeping the
  * two together means a screen never draws one room's seats inside another room's walls.
  */
-data class Evaluation(val session: Session, val result: ClarityResult)
+data class Evaluation(
+    val session: Session,
+    val result: ClarityResult,
+    /** Clarity across the whole floor (V1 heatmap, V9 terrain); null while the result is NeedsMore. */
+    val grid: ClarityGrid? = null,
+) {
+    companion object {
+        /** Everything the Results tab needs for [session]. Does the maths: call it off the main thread. */
+        fun of(session: Session) = Evaluation(session, ClarityModel.evaluate(session), ClarityModel.floorGrid(session))
+    }
+}
 
 data class RoomUiState(
     val saved: List<SavedRoom> = emptyList(),

@@ -1,19 +1,9 @@
 package com.clearroom.app.viz
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
 import com.clearroom.app.acoustics.RoomClarity
 import com.clearroom.app.acoustics.SeatLayout
@@ -112,19 +102,5 @@ fun ClarityRoom3D(room: Room, clarity: RoomClarity, description: String, modifie
     )
     val geometry = remember(room, clarity, labels) { ClarityRoomScene.build(room, clarity, colours, labels) { it.color().argb() } }
     val home = remember(room) { OrbitCamera.homeView(room.widthM, room.lengthM, room.heightM) }
-    val scheme = MaterialTheme.colorScheme
-    val backdrop = Brush.verticalGradient(listOf(scheme.surfaceContainerHigh, scheme.surfaceContainerLowest))
-    Scene3D(
-        geometry = geometry,
-        home = home,
-        description = description,
-        // Wider than tall, so the view's height is what limits it, as the home view's distance assumes.
-        modifier = modifier.fillMaxWidth().aspectRatio(SCENE_ASPECT).clip(RoundedCornerShape(12.dp)).background(backdrop),
-        labelText = SceneColors.LabelText,
-        labelBackground = SceneColors.LabelBackground,
-    )
+    FramedScene3D(geometry, home, description, modifier)
 }
-
-private const val SCENE_ASPECT = 1.15f
-
-private fun Color.argb() = Argb(toArgb())

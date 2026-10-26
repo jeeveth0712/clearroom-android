@@ -6,6 +6,7 @@ import com.clearroom.app.data.Session
 import com.clearroom.app.dsp.OctaveBands
 import com.clearroom.app.dsp.Sti
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /** A change to try before spending money (FR-8). Everything defaults to "as measured". */
 data class WhatIf(
@@ -61,6 +62,12 @@ data class RoomClarity(
     val criticalDistanceM: Double,
     /** False when the FR-5 fallback voice was used: results are then "uncalibrated" (NFR-5). */
     val voiceMeasured: Boolean,
+    /** Where the speaker stands, after any what-if move. */
+    val speaker: FloorPoint,
+    /** The voice per band at 1 m that the scores assume, after any what-if change (dB). */
+    val voiceAt1mDb: List<Double>,
+    /** The room constant R per band (m²), which sets the echo part of the speech level. */
+    val roomConstantM2: List<Double>,
 ) {
     fun at(seat: SeatId): SeatClarity = seats.first { it.seat == seat }
 
@@ -69,6 +76,28 @@ data class RoomClarity(
 
     val frontRowSti: Double get() = rowSti(0)
     val backRowSti: Double get() = rowSti(rows - 1)
+}
+
+/**
+ * STI across the whole floor (V1 heatmap, V9 terrain), at the corners of a grid of [columns] ×
+ * [rows] cells that tile the room exactly. Corner (i, j) is i cells from the left wall and j from
+ * the front wall; [sti] holds them row by row from the front-left corner.
+ */
+data class ClarityGrid(val widthM: Double, val lengthM: Double, val columns: Int, val rows: Int, val sti: List<Double>) {
+    init {
+        require(columns >= 1 && rows >= 1) { "grid needs at least one cell: $columns x $rows" }
+        require(sti.size == (columns + 1) * (rows + 1)) { "need ${(columns + 1) * (rows + 1)} corners, got ${sti.size}" }
+    }
+
+    val cellWidthM: Double get() = widthM / columns
+    val cellLengthM: Double get() = lengthM / rows
+
+    fun corner(i: Int, j: Int): Double = sti[j * (columns + 1) + i]
+
+    fun cornerPoint(i: Int, j: Int): FloorPoint = FloorPoint(i * cellWidthM, j * cellLengthM)
+
+    /** A cell's STI: the mean of its four corners. */
+    fun cell(i: Int, j: Int): Double = (corner(i, j) + corner(i + 1, j) + corner(i, j + 1) + corner(i + 1, j + 1)) / 4
 }
 
 sealed interface ClarityResult {
@@ -104,6 +133,9 @@ object ClarityModel {
     /** Shortest echo time allowed when subtracting the spread for the uncertainty range. */
     private const val MIN_T60_S = 0.05
 
+    /** Doc V1 and V9: STI on a 0.25 m grid. */
+    const val GRID_STEP_M = 0.25
+
     fun evaluate(session: Session, whatIf: WhatIf = WhatIf()): ClarityResult {
         val inputs = Inputs.of(session, whatIf) ?: return ClarityResult.NeedsMore(missingInputs(session))
         val seats = inputs.layout.map { seat ->
@@ -135,8 +167,27 @@ object ClarityModel {
                 rt60S = inputs.mean.t60S,
                 criticalDistanceM = SpeechPropagation.criticalDistanceM(session.room.volumeM3, speechT60),
                 voiceMeasured = session.voice != null,
+                speaker = inputs.speaker,
+                voiceAt1mDb = inputs.voiceAt1mDb,
+                roomConstantM2 = List(OctaveBands.COUNT) { inputs.mean.roomConstantM2(it) },
             ),
         )
+    }
+
+    /** STI over the whole floor on a grid of about [stepM] (V1, V9); null until there's enough to say. */
+    fun floorGrid(session: Session, whatIf: WhatIf = WhatIf(), stepM: Double = GRID_STEP_M): ClarityGrid? {
+        require(stepM > 0.0) { "grid step must be > 0, was $stepM" }
+        val inputs = Inputs.of(session, whatIf) ?: return null
+        val room = session.room
+        val columns = max(1, (room.widthM / stepM).roundToInt())
+        val rows = max(1, (room.lengthM / stepM).roundToInt())
+        val sti = (0..rows).flatMap { j ->
+            (0..columns).map { i ->
+                val point = FloorPoint(room.widthM * i / columns, room.lengthM * j / rows)
+                inputs.sti(inputs.mean, inputs.noiseAt(point), point.distanceTo(inputs.speaker))
+            }
+        }
+        return ClarityGrid(room.widthM, room.lengthM, columns, rows, sti)
     }
 
     /**

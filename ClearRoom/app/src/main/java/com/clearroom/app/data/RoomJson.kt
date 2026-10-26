@@ -94,6 +94,7 @@ object RoomJson {
         .put("noiseDb", seat.noise?.let { numbers(it.valuesDb) } ?: JSONObject.NULL)
         .put("fans", seat.fans?.name ?: JSONObject.NULL)
         .put("rtTakes", JSONArray().apply { seat.rtTakes.forEach { put(numbers(it.t60S)) } })
+        .put("lastClap", seat.lastClap?.let(::encodeCurves) ?: JSONObject.NULL)
 
     private fun decodeSeat(json: JSONObject) = SeatMeasure(
         row = json.getInt("row"),
@@ -101,6 +102,42 @@ object RoomJson {
         noise = if (json.isNull("noiseDb")) null else BandLevels(doubles(json.getJSONArray("noiseDb"))),
         fans = if (json.isNull("fans")) null else FanState.valueOf(json.getString("fans")),
         rtTakes = json.getJSONArray("rtTakes").arrays().map { RtTake(nullableDoubles(it)) },
+        // Rooms saved before the curves were kept have no "lastClap" at all: read that as none.
+        lastClap = json.optJSONObject("lastClap")?.let(::decodeCurvesOrNull),
+    )
+
+    /** Damaged curves only lose the charts they feed (V3, V10), never the room and its readings. */
+    private fun decodeCurvesOrNull(json: JSONObject): ClapCurves? = try {
+        decodeCurves(json)
+    } catch (e: JSONException) {
+        null
+    } catch (e: IllegalArgumentException) {
+        null
+    }
+
+    private fun encodeCurves(curves: ClapCurves) = JSONObject()
+        .put(
+            "bands",
+            JSONArray().apply {
+                curves.bands.forEach { band ->
+                    put(
+                        JSONObject()
+                            .put("schroederDb", numbers(band.schroederDb))
+                            .put("fit", band.fit?.let { JSONObject().put("slopeDbPerS", it.slopeDbPerS).put("interceptDb", it.interceptDb).put("xiPermille", it.xiPermille) } ?: JSONObject.NULL),
+                    )
+                }
+            },
+        )
+        .put("waterfallDb", JSONArray().apply { curves.waterfallDb.forEach { put(numbers(it)) } })
+
+    private fun decodeCurves(json: JSONObject) = ClapCurves(
+        bands = json.getJSONArray("bands").objects().map { band ->
+            BandCurve(
+                schroederDb = doubles(band.getJSONArray("schroederDb")),
+                fit = band.optJSONObject("fit")?.let { DecayFit(it.getDouble("slopeDbPerS"), it.getDouble("interceptDb"), it.getDouble("xiPermille")) },
+            )
+        },
+        waterfallDb = json.getJSONArray("waterfallDb").arrays().map(::doubles),
     )
 
     private fun numbers(values: List<Double?>) = JSONArray().apply {

@@ -49,4 +49,20 @@ class SampleDataTest {
             if (low != null && high != null) assertTrue(low > high, "take $take")
         }
     }
+
+    @Test
+    fun `every sample seat has clap curves for the decay chart and waterfall`() {
+        session.seats.forEach { assertNotNull(it.lastClap, "seat ${it.seat}") }
+    }
+
+    @Test
+    fun `illustrative curves fall from 0 dB along their fit, and the waterfall stays within its floor`() {
+        val curves = SampleData.illustrativeCurves(listOf(1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8))
+        curves.bands.forEachIndexed { band, curve ->
+            assertEquals(0.0, curve.schroederDb.first())
+            assertTrue(curve.schroederDb.zipWithNext().all { (a, b) -> b < a }, "band $band falls")
+            assertEquals(listOf(1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8)[band], assertNotNull(curve.fit).t60S, 1e-9)
+        }
+        assertTrue(curves.waterfallDb.all { band -> band.size == 200 && band.all { it in -60.0..2.0 } })
+    }
 }

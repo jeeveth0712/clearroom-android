@@ -247,7 +247,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 
 **Day 2 of the doc's plan: all views and features**
 
-- [ ] **M8 — Results tab.** Verdict card, V1 seat heatmap, V2 cause map, seat detail sheet, V9 clarity terrain, V10 echo waterfall, V3 decay curve, V4 RT60 bars, V13 MTF curves, V14 speech vs distance, V15 octave spectrum.
+- [x] **M8 — Results tab.** Verdict card, V1 seat heatmap, V2 cause map, seat detail sheet, V9 clarity terrain, V10 echo waterfall, V3 decay curve, V4 RT60 bars, V13 MTF curves, V14 speech vs distance, V15 octave spectrum. *(Done Oct 26: 407 laptop + 77 phone tests pass. Results tab: verdict card in plain words with its range; 3D room / seat map (V1) / cause map (V2) toggle, tap a seat for its details and V15; then V9 terrain, V3 decay curve, V4 echo time by pitch, V10 echo waterfall, V13 speech rhythm and V14 voice vs noise by distance. Every chart checked on the S24 Ultra with the sample room in dark mode. Each seat now keeps its latest clap's curves (numbers only) for V3 and V10.)*
   *Skills:* compose-charts-2d, compose-3d-scene.
   *Done when:* every Results card renders with the sample room in light and dark mode.
 - [ ] **M9 — Fixes tab.** What-if sliders, V6 fix ranking, V7 required voice, V12 what-if morph animation.

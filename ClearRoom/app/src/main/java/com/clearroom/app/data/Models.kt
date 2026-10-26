@@ -1,5 +1,6 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.dsp.DspConstants
 import com.clearroom.app.dsp.OctaveBands
 
 /**
@@ -71,6 +72,39 @@ data class RtTake(val t60S: List<Double?>) {
     }
 }
 
+/** The T20 line fitted to one band's decay: level = interceptDb + slopeDbPerS · t, t in s from the peak. */
+data class DecayFit(val slopeDbPerS: Double, val interceptDb: Double, val xiPermille: Double) {
+    init {
+        require(slopeDbPerS < 0.0 && slopeDbPerS.isFinite()) { "a decay must fall: $slopeDbPerS dB/s" }
+        require(interceptDb.isFinite() && xiPermille.isFinite()) { "fit must be finite: $interceptDb dB, $xiPermille ‰" }
+    }
+
+    /** The echo time this line gives: how long it takes to fall 60 dB. */
+    val t60S: Double get() = -60.0 / slopeDbPerS
+}
+
+/** One band of a clap for the decay chart (V3): an empty curve and no fit where the band was rejected. */
+data class BandCurve(val schroederDb: List<Double>, val fit: DecayFit?) {
+    init {
+        require(schroederDb.all { it.isFinite() }) { "curve levels must be finite" }
+    }
+}
+
+/**
+ * The latest accepted clap at a seat, kept for the decay chart (V3) and the echo waterfall (V10).
+ * Levels in dB, one value every [STEP_S]. Numbers only, never audio (NFR-6).
+ */
+data class ClapCurves(val bands: List<BandCurve>, val waterfallDb: List<List<Double>>) {
+    init {
+        require(bands.size == OctaveBands.COUNT && waterfallDb.size == OctaveBands.COUNT) { "need ${OctaveBands.COUNT} bands" }
+        require(waterfallDb.all { band -> band.all { it.isFinite() } }) { "waterfall levels must be finite" }
+    }
+
+    companion object {
+        const val STEP_S = DspConstants.CURVE_STEP_S
+    }
+}
+
 /** Everything measured at one seat (doc data model). Row 0 is the front row. */
 data class SeatMeasure(
     val row: Int,
@@ -78,6 +112,8 @@ data class SeatMeasure(
     val noise: BandLevels? = null,
     val fans: FanState? = null,
     val rtTakes: List<RtTake> = emptyList(),
+    /** Curves of the latest accepted clap here; null before any clap, and for older saved rooms. */
+    val lastClap: ClapCurves? = null,
 ) {
     init {
         require(row >= 0 && col >= 0) { "seat position can't be negative: ($row, $col)" }
@@ -115,16 +151,16 @@ data class Session(
     /** FR-5: records (or replaces) the speaker's voice reference at 1 m. */
     fun withVoice(voice: BandLevels): Session = copy(voice = voice)
 
-    /** FR-2: adds one accepted clap take at [seat], keeping the earlier takes and the noise. */
-    fun withClap(seat: SeatId, take: RtTake): Session =
-        updateSeat(seat) { it.copy(rtTakes = it.rtTakes + take) }
+    /** FR-2: adds one accepted clap take at [seat], keeping the earlier takes and the noise; [curves] become its latest. */
+    fun withClap(seat: SeatId, take: RtTake, curves: ClapCurves? = null): Session =
+        updateSeat(seat) { it.copy(rtTakes = it.rtTakes + take, lastClap = curves ?: it.lastClap) }
 
     /** Removes everything measured at [seat] (noise and claps), as if it had never been measured. */
     fun withoutSeat(seat: SeatId): Session = copy(seats = seats.filterNot { it.seat == seat })
 
     /** Clears the clap takes at [seat] so they can be redone; its noise reading stays. */
     fun withoutClaps(seat: SeatId): Session =
-        if (measureAt(seat) == null) this else updateSeat(seat) { it.copy(rtTakes = emptyList()) }
+        if (measureAt(seat) == null) this else updateSeat(seat) { it.copy(rtTakes = emptyList(), lastClap = null) }
 
     private fun updateSeat(seat: SeatId, change: (SeatMeasure) -> SeatMeasure): Session {
         require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }

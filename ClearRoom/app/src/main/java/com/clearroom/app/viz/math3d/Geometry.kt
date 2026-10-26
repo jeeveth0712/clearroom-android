@@ -8,9 +8,10 @@ import kotlin.math.sin
 /**
  * One flat polygon of the scene. [closedSolid] faces belong to boxes, cones or the room's walls and
  * are skipped when facing away from the camera; open surfaces (the floor, meshes) show from both
- * sides. Points go counter-clockwise when seen from the side the face points to.
+ * sides. Points go counter-clockwise when seen from the side the face points to. [outlined] faces
+ * get a darker edge (bars, walls); mesh pieces don't, so a surface reads as one smooth sheet.
  */
-class Face3(val points: List<Vec3>, val color: Argb, val closedSolid: Boolean) {
+class Face3(val points: List<Vec3>, val color: Argb, val closedSolid: Boolean, val outlined: Boolean = true) {
     init {
         require(points.size >= 3) { "a face needs at least 3 points" }
     }

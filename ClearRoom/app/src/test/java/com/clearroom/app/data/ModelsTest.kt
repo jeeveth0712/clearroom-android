@@ -173,4 +173,53 @@ class ModelsTest {
         assertEquals("a", SavedRoom.Readable(summary).id)
         assertEquals("b", SavedRoom.Damaged("b").id)
     }
+
+    // --- Clap curves (V3, V10) ----------------------------------------------------------------------
+
+    private val curves = ClapCurves(List(7) { BandCurve(listOf(0.0, -1.0), DecayFit(-60.0, 0.0, 2.0)) }, List(7) { listOf(0.0, -3.0) })
+
+    @Test
+    fun `a decay fit gives the time to fall 60 dB`() {
+        assertEquals(1.2, DecayFit(slopeDbPerS = -50.0, interceptDb = 0.5, xiPermille = 3.0).t60S, 1e-12)
+    }
+
+    @Test
+    fun `a decay fit must fall and be finite`() {
+        assertFailsWith<IllegalArgumentException> { DecayFit(0.0, 0.0, 1.0) }
+        assertFailsWith<IllegalArgumentException> { DecayFit(10.0, 0.0, 1.0) }
+        assertFailsWith<IllegalArgumentException> { DecayFit(-50.0, Double.NaN, 1.0) }
+    }
+
+    @Test
+    fun `curve levels must be finite`() {
+        assertFailsWith<IllegalArgumentException> { BandCurve(listOf(0.0, Double.NEGATIVE_INFINITY), null) }
+        assertFailsWith<IllegalArgumentException> { ClapCurves(curves.bands, List(7) { listOf(Double.NaN) }) }
+    }
+
+    @Test
+    fun `clap curves need all seven bands`() {
+        assertFailsWith<IllegalArgumentException> { ClapCurves(curves.bands.take(6), curves.waterfallDb) }
+        assertFailsWith<IllegalArgumentException> { ClapCurves(curves.bands, curves.waterfallDb.take(6)) }
+    }
+
+    @Test
+    fun `an accepted clap with curves becomes the seat's latest clap`() {
+        val session = Session(aRoom()).withClap(SeatId(1, 1), RtTake(List(7) { 0.8 }), curves)
+        assertEquals(curves, assertNotNullSeat(session, SeatId(1, 1)).lastClap)
+    }
+
+    @Test
+    fun `a clap without curves keeps the curves of the one before`() {
+        val seat = SeatId(1, 1)
+        val session = Session(aRoom()).withClap(seat, RtTake(List(7) { 0.8 }), curves).withClap(seat, RtTake(List(7) { 0.9 }))
+        assertEquals(curves, assertNotNullSeat(session, seat).lastClap)
+        assertEquals(2, assertNotNullSeat(session, seat).rtTakes.size)
+    }
+
+    @Test
+    fun `clearing a seat's claps clears its curves too`() {
+        val seat = SeatId(1, 1)
+        val session = Session(aRoom()).withClap(seat, RtTake(List(7) { 0.8 }), curves).withoutClaps(seat)
+        assertEquals(null, assertNotNullSeat(session, seat).lastClap)
+    }
 }

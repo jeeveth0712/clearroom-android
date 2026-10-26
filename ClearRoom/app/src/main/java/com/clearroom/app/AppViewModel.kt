@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
@@ -71,7 +70,7 @@ class AppViewModel(
     val clarity: StateFlow<Evaluation?> = state
         .map { it.session }
         .distinctUntilChanged()
-        .map { session -> session?.let { Evaluation(it, ClarityModel.evaluate(it)) } }
+        .map { session -> session?.let(Evaluation::of) }
         .flowOn(dsp)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -154,7 +153,7 @@ class AppViewModel(
             when (val verdict = ClapTake.judge(result)) {
                 is ClapVerdict.Rejected -> MeasurePhase.ClapRejected(verdict.problem)
                 is ClapVerdict.Accepted -> {
-                    val saved = saveMeasurement(roomId) { it.withClap(seat, verdict.take) }
+                    val saved = saveMeasurement(roomId) { it.withClap(seat, verdict.take, ClapTake.curvesOf(verdict.analysis)) }
                     val speechRt60S = requireNotNull(Rt60Summary.of(listOf(verdict.take))).speechRt60S
                     if (saved == null) MeasurePhase.SaveFailed
                     else MeasurePhase.ClapAccepted(seat, saved.measureAt(seat)?.rtTakes?.size ?: 1, speechRt60S)

@@ -163,7 +163,6 @@
     <string name="results_missing_echo">• Echo: a clap test at one seat or more</string>
     <string name="results_missing_noise">• Background noise at one seat or more</string>
     <string name="results_working">Working out the clarity…</string>
-    <string name="results_3d_title">3D clarity room</string>
     <string name="results_3d_caption">Each bar is a seat: taller and bluer means clearer. The cone is the speaker. Drag to turn the room, pinch to zoom, double-tap to reset.</string>
     <string name="results_3d_description">3D view of the room. Front row: %1$s. Back row: %2$s.</string>
     <string name="results_3d_label_speaker">Speaker</string>
@@ -173,6 +172,109 @@
     <string name="band_fair">Fair</string>
     <string name="band_good">Good</string>
     <string name="band_excellent">Excellent</string>
+    <string name="band_phrase_poor">hard to follow</string>
+    <string name="band_phrase_fair">tiring to follow</string>
+    <string name="band_phrase_good">easy to follow</string>
+    <string name="band_phrase_excellent">very easy to follow</string>
+    <!-- %1$s is a band name, %2$s and %3$s the low and high end of its clarity range (0–1) -->
+    <string name="results_band_range">%1$s · %2$s–%3$s</string>
+    <string name="results_band_value">%1$s · %2$s</string>
+
+    <!-- Results: verdict card (FR-6, FR-7, NFR-2, NFR-10) -->
+    <string name="results_verdict_back">Back rows: %1$s</string>
+    <string name="results_verdict_all">All seats: %1$s</string>
+    <string name="results_verdict_front">Front rows: %1$s (%2$s)</string>
+    <string name="results_verdict_cause">Main cause: %1$s</string>
+    <string name="cause_echo">echo</string>
+    <string name="cause_noise">background noise</string>
+    <string name="cause_distance">distance from the speaker</string>
+    <string name="cause_echo_why">Sound keeps bouncing around the room and blurs words. Curtains or soft boards help most.</string>
+    <string name="cause_noise_why">Background noise covers the speaker’s voice. Quieter fans or closed windows help most.</string>
+    <string name="cause_distance_why">These seats are far from the speaker. Moving closer or using a microphone helps most.</string>
+
+    <!-- Results: 3D room, seat map (V1) and cause map (V2) -->
+    <string name="results_view_3d">3D room</string>
+    <string name="results_view_map">Seat map</string>
+    <string name="results_view_causes">Causes</string>
+    <string name="results_map_caption">Colours show how clearly each spot can hear. Seats with a dot were measured; the rest are worked out from them. Tap a seat for its details.</string>
+    <plurals name="results_map_description">
+        <item quantity="one">Seat map. %1$d of %2$d seat is easy to follow or better.</item>
+        <item quantity="other">Seat map. %1$d of %2$d seats are easy to follow or better.</item>
+    </plurals>
+    <string name="results_causes_caption">Each seat’s icon shows the one change that would help it most. Tap a seat for its details.</string>
+    <string name="results_causes_description">Cause map. Seats limited by echo: %1$d, by noise: %2$d, by distance: %3$d.</string>
+    <string name="cause_echo_legend">Echo: add curtains or soft boards</string>
+    <string name="cause_noise_legend">Noise: quieter fans, close the windows</string>
+    <string name="cause_distance_legend">Distance: move closer or use a microphone</string>
+
+    <!-- Results: seat details and V15 -->
+    <string name="results_seat_title">Seat details: %1$s</string>
+    <string name="results_seat_distance">%1$s m from the speaker</string>
+    <string name="results_seat_measured">measured at this seat</string>
+    <string name="results_seat_estimated">worked out from the nearest measured seats</string>
+    <string name="results_seat_hint">Tap another seat on the seat map or cause map to see it here.</string>
+    <string name="results_spectrum_title">Voice and noise by pitch</string>
+    <string name="results_spectrum_caption">Where the grey noise bar reaches the voice bar, that pitch is drowned out. The numbers show how far the voice is above the noise; 15 dB or more is comfortable.</string>
+    <string name="results_spectrum_description">At this seat the voice is %1$d dB above the noise at speech pitches.</string>
+
+    <!-- Results: V9 clarity terrain -->
+    <string name="results_terrain_title">Clarity across the floor</string>
+    <string name="results_terrain_caption">Height and colour show how clearly each spot can hear. The white line marks where listening becomes easy (0.60). Drag sideways to turn, pinch to zoom.</string>
+    <string name="results_terrain_description">Clarity across the floor, from %1$s at the worst spot to %2$s at the best.</string>
+
+    <!-- Results: V3 decay curve -->
+    <string name="results_decay_title">How a clap dies away</string>
+    <string name="results_decay_source">Latest clap at %1$s</string>
+    <!-- %1$s band name, %2$s echo time in seconds, %3$s fit quality -->
+    <string name="results_decay_value">%1$s: echo time %2$s s · %3$s</string>
+    <string name="results_decay_fit_clean">clean fit</string>
+    <string name="results_decay_fit_usable">usable fit</string>
+    <string name="results_decay_fit_rough">rough fit, clap again</string>
+    <string name="results_decay_band_rejected">This pitch was too weak in the clap to measure.</string>
+    <string name="results_decay_caption">The curve is the clap fading away; the straight line is the fit that gives the echo time, over the shaded range. The closer they match, the more you can trust the number.</string>
+    <string name="results_decay_empty">Do a clap test on the Measure tab to see how the sound dies away.</string>
+
+    <!-- Results: V4 echo time by pitch -->
+    <string name="results_rt_title">Echo time by pitch</string>
+    <string name="results_rt_target">Classroom target %1$s s</string>
+    <string name="results_rt_too_long">Too long</string>
+    <string name="results_rt_caption_over">At speech pitches the echo lasts about %1$s s, longer than the %2$s s a classroom should have. The amber part of each bar is how much too long it rings.</string>
+    <string name="results_rt_caption_ok">At speech pitches the echo lasts about %1$s s, within the %2$s s a classroom should have.</string>
+    <string name="results_rt_hint_low">Low pitches ring longest: thick panels or soft furniture help most.</string>
+    <string name="results_rt_hint_mid">Mid pitches ring longest: curtains or soft boards help most.</string>
+    <string name="results_rt_hint_high">High pitches ring longest: even thin curtains help.</string>
+    <string name="results_rt_estimated">Faded bars are borrowed from the nearest pitch: the claps were too weak there.</string>
+
+    <!-- Results: V10 echo waterfall -->
+    <string name="results_waterfall_title">Echo waterfall</string>
+    <string name="results_waterfall_caption">Each ridge is one pitch fading after the clap; longer ridges ring longer.</string>
+    <string name="results_waterfall_longest">Here %1$s rings longest, about %2$s s.</string>
+
+    <!-- Results: V13 modulation transfer -->
+    <string name="results_mtf_title">How much speech rhythm survives</string>
+    <string name="results_mtf_caption">Speech is a rhythm of loud and soft. Each line shows how much of it reaches this seat at one pitch (1 = all of it). Echo pulls the lines down on the right; noise pulls them all down.</string>
+    <string name="results_mtf_description">At %1$s, about %2$d%% of the speech rhythm survives at 1 kHz.</string>
+
+    <!-- Results: V14 speech vs noise by distance -->
+    <string name="results_distance_title">Voice and noise by distance</string>
+    <string name="results_distance_echo_takes_over">Echo takes over</string>
+    <string name="results_distance_caption_masked">The voice (line) gets quieter away from the speaker and levels off beyond about %1$s m, where echo takes over. At the back it is only %2$d dB above the noise; about 15 dB is needed for easy listening.</string>
+    <string name="results_distance_caption_ok">The voice (line) gets quieter away from the speaker and levels off beyond about %1$s m, where echo takes over. At the back it is still %2$d dB above the noise, enough for easy listening.</string>
+
+    <!-- Chart axes and legends -->
+    <string name="chart_pitch_hz">Pitch (Hz)</string>
+    <string name="chart_echo_time_s">Echo time (s)</string>
+    <string name="chart_time_after_clap_s">Time after the clap (s)</string>
+    <string name="chart_level_db">Level (dB)</string>
+    <string name="chart_level_relative_db">Level (dB, relative)</string>
+    <string name="chart_level_1k_db">Level at 1 kHz (dB, voice at 1 m = 0)</string>
+    <string name="chart_distance_m">Distance from the speaker (m)</string>
+    <string name="chart_rhythm_hz">Rhythm speed (Hz)</string>
+    <string name="chart_rhythm_kept">Rhythm kept (0–1)</string>
+    <string name="chart_voice">Voice</string>
+    <string name="chart_noise">Noise</string>
+    <string name="chart_masked_zone">Less than 15 dB above noise</string>
+    <string name="chart_seconds">%1$d s</string>
 
     <!-- Band levels table -->
     <string name="levels_caption">dB relative to the phone\'s maximum. Only differences between readings matter.</string>

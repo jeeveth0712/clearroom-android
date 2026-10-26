@@ -66,4 +66,33 @@ class RoomJsonTest {
         )
         broken.forEach { text -> assertFailsWith<RoomFormatException>(text.take(80)) { RoomJson.decode(text) } }
     }
+
+    @Test
+    fun `a seat's latest clap curves survive a save and load, rejected bands included`() {
+        val curves = ClapCurves(
+            List(7) { band -> if (band == 0) BandCurve(emptyList(), null) else BandCurve(listOf(0.0, -1.25, -2.5), DecayFit(-55.5, 0.25, 3.5)) },
+            List(7) { listOf(0.0, -10.5, -60.0) },
+        )
+        val session = Session(aRoom()).withClap(SeatId(0, 1), RtTake(List(7) { 1.0 }), curves)
+        assertEquals(session, roundTrip(session).session)
+    }
+
+    @Test
+    fun `a room saved before curves were kept still loads, with no curves`() {
+        val session = Session(aRoom()).withClap(SeatId(0, 1), RtTake(List(7) { 1.0 }))
+        val old = JSONObject(RoomJson.encode(session, 1L)).apply { getJSONArray("seats").getJSONObject(0).remove("lastClap") }.toString()
+        assertEquals(session, RoomJson.decode(old).session)
+    }
+
+    @Test
+    fun `damaged clap curves are dropped, but the room and its readings still load`() {
+        val curves = ClapCurves(List(7) { BandCurve(listOf(0.0, -1.0), DecayFit(-60.0, 0.0, 2.0)) }, List(7) { listOf(0.0, -3.0) })
+        val session = Session(aRoom()).withClap(SeatId(0, 1), RtTake(List(7) { 1.0 }), curves)
+        val damaged = JSONObject(RoomJson.encode(session, 1L)).apply {
+            getJSONArray("seats").getJSONObject(0).getJSONObject("lastClap").getJSONArray("bands").remove(0) // only 6 bands left
+        }.toString()
+        val loaded = RoomJson.decode(damaged).session
+        assertEquals(null, loaded.measureAt(SeatId(0, 1))?.lastClap)
+        assertEquals(session.measureAt(SeatId(0, 1))?.rtTakes, loaded.measureAt(SeatId(0, 1))?.rtTakes)
+    }
 }

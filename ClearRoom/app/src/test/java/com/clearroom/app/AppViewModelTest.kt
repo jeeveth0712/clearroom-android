@@ -285,7 +285,9 @@ class AppViewModelTest {
         assertEquals(1, accepted.takes)
         assertEquals(0.8, accepted.speechRt60S, absoluteTolerance = 0.08)
         assertEquals(listOf(5.0), audio.requestedSeconds)
-        assertEquals(1, assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(4, 2))).rtTakes.size)
+        val saved = assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(4, 2)))
+        assertEquals(1, saved.rtTakes.size)
+        assertEquals(0.8, assertNotNull(assertNotNull(saved.lastClap).bands[3].fit).t60S, 0.08) // the curves are kept for V3 and V10
     }
 
     @Test

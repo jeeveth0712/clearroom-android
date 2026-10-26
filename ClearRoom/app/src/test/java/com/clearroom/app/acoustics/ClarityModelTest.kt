@@ -1,5 +1,7 @@
 package com.clearroom.app.acoustics
 
+import kotlin.test.assertNotNull
+import kotlin.test.assertFailsWith
 import com.clearroom.app.data.RtTake
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SeatId
@@ -188,5 +190,74 @@ class ClarityModelTest {
     @Test
     fun `no voice advice before there is enough to measure`() {
         assertEquals(null, ClarityModel.requiredVoice(Session(aRoom())))
+    }
+
+    // --- What the charts need (V13, V14) ------------------------------------------------------------
+
+    @Test
+    fun `results carry the speaker spot, the voice used and the room constant per band`() {
+        val room = ready(sample)
+        assertEquals(SeatLayout.speaker(sample.room), room.speaker)
+        assertEquals(assertNotNull(sample.voice).valuesDb, room.voiceAt1mDb)
+        assertEquals(7, room.roomConstantM2.size)
+        assertTrue(room.roomConstantM2.all { it > 0.0 })
+    }
+
+    @Test
+    fun `a louder what-if voice shows in the voice the results assume`() {
+        assertEquals(assertNotNull(sample.voice).valuesDb.map { it + 6.0 }, ready(sample, WhatIf(voiceChangeDb = 6.0)).voiceAt1mDb)
+    }
+
+    // --- Floor grid (V1, V9) ------------------------------------------------------------------------
+
+    @Test
+    fun `the floor grid tiles the room in about 25 cm cells`() {
+        val grid = assertNotNull(ClarityModel.floorGrid(sample))
+        assertEquals(28, grid.columns) // 7 m / 0.25 m
+        assertEquals(36, grid.rows) // 9 m / 0.25 m
+        assertEquals(29 * 37, grid.sti.size)
+        assertEquals(FloorPoint(7.0, 9.0), grid.cornerPoint(28, 36))
+        assertTrue(grid.sti.all { it in 0.0..1.0 })
+    }
+
+    @Test
+    fun `clarity on the floor is best near the speaker and worst at the back`() {
+        val grid = assertNotNull(ClarityModel.floorGrid(sample))
+        val nearSpeaker = grid.corner(14, 6) // 3.5 m across, 1.5 m from the front wall
+        val backCorner = grid.corner(0, 36)
+        assertTrue(nearSpeaker > backCorner, "near $nearSpeaker, back $backCorner")
+    }
+
+    @Test
+    fun `a grid point at a seat scores what the seat scores`() {
+        val room = aRoom(lengthM = 9.0, widthM = 7.0, rows = 1, cols = 1) // the single seat sits at (3.5, 2.5)
+        val session = Session(room, voice = flatBands(-30.0), seats = listOf(SeatMeasure(0, 0, noise = flatBands(-60.0), rtTakes = listOf(RtTake(List(7) { 0.8 })))))
+        val grid = assertNotNull(ClarityModel.floorGrid(session, stepM = 0.5))
+        assertEquals(ready(session).at(SeatId(0, 0)).sti, grid.corner(7, 5), 1e-9)
+    }
+
+    @Test
+    fun `there is no floor grid before there's enough to say`() {
+        assertEquals(null, ClarityModel.floorGrid(Session(aRoom())))
+    }
+
+    @Test
+    fun `the grid step must be positive`() {
+        assertFailsWith<IllegalArgumentException> { ClarityModel.floorGrid(sample, stepM = 0.0) }
+    }
+
+    @Test
+    fun `a grid cell scores the mean of its corners`() {
+        val grid = ClarityGrid(widthM = 2.0, lengthM = 1.0, columns = 2, rows = 1, sti = listOf(0.2, 0.4, 0.6, 0.4, 0.6, 0.8))
+        assertEquals(0.4, grid.cell(0, 0), 1e-12)
+        assertEquals(0.6, grid.cell(1, 0), 1e-12)
+        assertEquals(1.0, grid.cellWidthM)
+        assertEquals(0.8, grid.corner(2, 1))
+    }
+
+    @Test
+    fun `a grid needs a cell and the right number of corners`() {
+        assertFailsWith<IllegalArgumentException> { ClarityGrid(1.0, 1.0, 0, 1, emptyList()) }
+        assertFailsWith<IllegalArgumentException> { ClarityGrid(1.0, 1.0, 1, 1, listOf(0.5, 0.5, 0.5)) }
     }
 }

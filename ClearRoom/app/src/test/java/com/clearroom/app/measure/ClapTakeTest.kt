@@ -1,5 +1,8 @@
 package com.clearroom.app.measure
 
+import kotlin.test.assertNotNull
+import com.clearroom.app.data.DecayFit
+import com.clearroom.app.data.BandCurve
 import com.clearroom.app.dsp.BandDecay
 import com.clearroom.app.dsp.OctaveBands
 import com.clearroom.app.dsp.RejectReason
@@ -73,5 +76,33 @@ class ClapTakeTest {
     fun `a clap where every band failed is never accepted`() {
         val result = analysed(*Array(7) { rejected(RejectReason.FIT_POOR) })
         assertEquals(ClapVerdict.Rejected(ClapProblem.UNCLEAR), ClapTake.judge(result))
+    }
+
+    @Test
+    fun `the curves kept from a clap are rounded to a hundredth of a dB`() {
+        val band = BandDecay.Ok(1.0, null, 2.5, 45.0, -85.0, listOf(0.0, -1.23456, -2.5), -60.0, 0.1)
+        val analysis = ReverbResult.Analysed(List(7) { band }, List(7) { listOf(-0.004, -12.3456) })
+        val curves = ClapTake.curvesOf(analysis)
+        assertEquals(listOf(0.0, -1.23, -2.5), curves.bands[0].schroederDb)
+        assertEquals(listOf(0.0, -12.35), curves.waterfallDb[0])
+        assertEquals(DecayFit(-60.0, 0.1, 2.5), curves.bands[0].fit)
+    }
+
+    @Test
+    fun `a rejected band keeps no curve and no fit`() {
+        val bands = List(7) { if (it == 0) rejected(RejectReason.LOW_DYNAMIC_RANGE) else ok(1.0) }
+        val curves = ClapTake.curvesOf(ReverbResult.Analysed(bands, List(7) { listOf(0.0) }))
+        assertEquals(BandCurve(emptyList(), null), curves.bands[0])
+        assertEquals(DecayFit(-60.0, 0.0, 2.0), curves.bands[1].fit)
+    }
+
+    @Test
+    fun `a real synthetic clap gives curves whose fit matches the echo time`() {
+        val clip = Signals.syntheticClap(t60S = 0.8, sampleRate = 48_000)
+        val analysis = assertIs<ReverbResult.Analysed>(Reverb.analyse(clip, 48_000))
+        val curves = ClapTake.curvesOf(analysis)
+        val fit = assertNotNull(curves.bands[3].fit)
+        assertEquals(0.8, fit.t60S, 0.08)
+        assertEquals(7, curves.waterfallDb.size)
     }
 }

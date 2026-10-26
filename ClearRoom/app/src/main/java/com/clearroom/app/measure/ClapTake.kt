@@ -1,5 +1,8 @@
 package com.clearroom.app.measure
 
+import com.clearroom.app.data.BandCurve
+import com.clearroom.app.data.ClapCurves
+import com.clearroom.app.data.DecayFit
 import com.clearroom.app.data.RtTake
 import com.clearroom.app.dsp.BandDecay
 import com.clearroom.app.dsp.OctaveBands
@@ -40,6 +43,22 @@ object ClapTake {
      * levels are uncalibrated, so this is a rough split between "clap louder" and "too noisy".
      */
     const val NOISY_FLOOR_DBFS = -60.0
+
+    /**
+     * The curves of an analysed clap to keep with the seat (V3, V10), rounded to 0.01 dB: finer
+     * than any chart shows, and it keeps room files small.
+     */
+    fun curvesOf(analysis: ReverbResult.Analysed): ClapCurves = ClapCurves(
+        bands = analysis.bands.map { band ->
+            when (band) {
+                is BandDecay.Ok -> BandCurve(band.schroederDb.map(::centiDb), DecayFit(band.fitSlopeDbPerS, band.fitInterceptDb, band.xiPermille))
+                is BandDecay.Rejected -> BandCurve(emptyList(), fit = null)
+            }
+        },
+        waterfallDb = analysis.waterfallDb.map { band -> band.map(::centiDb) },
+    )
+
+    private fun centiDb(db: Double): Double = Math.round(db * 100) / 100.0
 
     fun judge(result: ReverbResult): ClapVerdict = when (result) {
         ReverbResult.NoClap -> ClapVerdict.Rejected(ClapProblem.NO_CLAP)

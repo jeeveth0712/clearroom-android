@@ -2,8 +2,8 @@ package com.clearroom.app.viz.math3d
 
 import kotlin.math.max
 
-/** A face ready to paint: screen points as x, y pairs in pixels, with its shaded colour. */
-class ScreenFace(val points: FloatArray, val color: Argb)
+/** A face ready to paint: screen points as x, y pairs in pixels, its shaded colour, and whether to edge it. */
+class ScreenFace(val points: FloatArray, val color: Argb, val outlined: Boolean = true)
 
 class ScreenLine(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val color: Argb)
 
@@ -33,7 +33,7 @@ object ScenePass {
                 points[2 * i] = x
                 points[2 * i + 1] = y
             }
-            return ScreenFace(points, face.color.shaded(face.shade))
+            return ScreenFace(points, face.color.shaded(face.shade), face.outlined)
         }
 
         // A solid is sorted as a whole by its centre; a loose face by its own centre. Anything
