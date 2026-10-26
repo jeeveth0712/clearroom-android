@@ -297,3 +297,29 @@ All tests fit in three or four rooms you can access (a classroom, a small semina
 - [Kardous & Shaw, smartphone sound app accuracy (NIOSH)](https://pmc.ncbi.nlm.nih.gov/articles/PMC4545478): why absolute phone dB readings are unreliable
 - [Browser-based reverberation time with smartphones (Aalborg University)](https://vbn.aau.dk/da/publications/92e37e33-5327-4621-92b1-65c4551ccc42): built-in phone mics gave results comparable to ISO 3382-2 reference measurements on Android
 - [YAMNet on-device audio classification](https://developers.google.com/codelabs/tflite-audio-classification-basic-android)
+
+## Implementation notes
+
+Kept up to date during the build. The sections above are the original plan; this section records where the built app differs from it, and why. Progress per milestone is tracked in `docs/ClearRoom-Setup-and-Build-Plan.md`.
+
+### Decisions where the plan left a choice
+
+| Topic | Plan said | Built | Why |
+| --- | --- | --- | --- |
+| Noise snapshot length | FR-4: 30 s · parameters table: 10 s | **30 s** | Steadier reading when noise comes and goes (owner's choice) |
+| Surfaces | Data model: one `surfacePreset` · FR-1: tag surfaces from a pick list | Floor, walls and ceiling each tagged from the FR-1 pick list; seated students as a count | Follows FR-1, which is the functional requirement |
+
+### Changes made during the build
+
+| Area | Change | Why |
+| --- | --- | --- |
+| Data model | Band levels are stored as a 7-value list type (`BandLevels`), not `DoubleArray`; every `Room` has a stable id used for its file name | Arrays compare by reference, so changed readings could silently fail to update the screen; file names never come from user-typed text |
+| Measuring | The built-in sample room can be explored but not measured into; saving it makes the user's own copy | Keeps the reference example unchanged |
+| Toolchain | Android Studio Rabbit 1 (2026.2.1), AGP 9.4.1, Kotlin raised from the template's 2.2.10 to 2.4.21, Compose BOM 2026.09.00 | Kotlin 2.2.10 is only tested up to AGP 8.10; 2.4.21 is tested with this Gradle and much closer to this AGP |
+| Icons | Tab icons drawn as small vector files | Material 3 1.4 no longer bundles the Material icon library |
+| Testing | On-phone tests run in a separate test app (`com.clearroom.app.uitest`) | The test runner uninstalls the app it tests; this way it never erases the user's saved rooms |
+
+### Measured on the test phone (Samsung Galaxy S24 Ultra, Android 16)
+
+- The phone does **not** offer Android's raw `UNPROCESSED` microphone source, so ClearRoom uses the `VOICE_RECOGNITION` source at 48 kHz, 32-bit float, as NFR-7 allows. Android attaches a noise suppressor and an echo canceller to that source; ClearRoom switches both off. No automatic gain control is attached.
+- During a phone call Android gives other apps silence instead of microphone sound. ClearRoom detects this and says "No sound came through" instead of saving a wrong reading.
