@@ -227,7 +227,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 - [x] **M2 — Recorder.** `AppContainer` and `AppViewModel` (moved from M1: they first hold real state here), `AudioRecord` at 48 kHz mono, microphone source selection, auto-gain and noise suppression off, live level meter, clipping and busy-microphone checks. *(Done Oct 26: 54 laptop + 19 phone tests pass. Finding: the S24 Ultra doesn't offer the raw `UNPROCESSED` source, so ClearRoom uses `VOICE_RECOGNITION` at 48 kHz float and switches off the noise suppressor and echo canceller it finds attached; no auto-gain is attached on that source. A phone call takes the microphone and other apps get silence, which ClearRoom reports as "No sound came through".)*
   *Skills:* android-audio-capture.
   *Done when:* the Measure tab records 5 s with a moving level bar and shows which microphone source the S24 Ultra uses.
-- [ ] **M3 — Data and Room tab.** Data models, JSON store, room form, seat grid, built-in sample room.
+- [x] **M3 — Data and Room tab.** Data models, JSON store, room form, seat grid, built-in sample room. *(Done Oct 26: 117 laptop + 40 phone tests pass. Rooms are saved atomically as one JSON file each, named by id; the last saved room reopens on start; a damaged file is listed separately and can be deleted. Surfaces follow FR-1's pick list per floor, walls and ceiling.)*
   *Skills:* storage-and-pdf-report, clearroom-android-foundation.
   *Done when:* a room survives closing and reopening the app, and the sample room loads.
 - [ ] **M4 — Filters and levels.** Biquad filters, 7-band octave bank, noise snapshot, voice reference.
@@ -312,6 +312,8 @@ The requirements doc contradicts itself or leaves gaps in a few places. Claude u
 | Gradle says it needs Java 17 or newer | `JAVA_HOME` isn't set, or the terminal predates A6. In Studio: *Settings → Build Tools → Gradle → Gradle JDK* → *jbr* |
 | Build is very slow | Check the Defender exclusions (A7), Best performance power mode, charger connected |
 | The app installs but the screen is blank | Tell Claude: it will read the crash log with `adb logcat` |
+| Phone tests fail with "No compose hierarchies found" | The phone locked during the run. Keep it unlocked; set *Screen timeout* to 10 minutes or turn on *Developer options → Stay awake* while charging |
+| Gradle says "There were failing tests" but the report shows all passed | Seen when the phone was connected as `IP:port` (manual `adb connect`). Run `adb disconnect`, let it reconnect by itself (`adb devices` shows `adb-…_adb-tls-connect._tcp`), and rerun |
 
 ---
 

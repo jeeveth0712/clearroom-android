@@ -18,6 +18,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.clearroom.app.R
 import com.clearroom.app.ui.screens.MeasureScreen
+import com.clearroom.app.ui.screens.RoomScreen
 import com.clearroom.app.ui.screens.TabIntro
 import com.clearroom.app.ui.theme.ClearRoomTheme
 
@@ -39,7 +40,7 @@ fun ClearRoomApp(
     ) { innerPadding ->
         val contentModifier = Modifier.padding(innerPadding)
         when (selectedTab) {
-            AppTab.ROOM -> TabIntro(AppTab.ROOM.labelRes, R.string.room_intro, contentModifier)
+            AppTab.ROOM -> RoomScreen(state.room, onEvent, contentModifier)
             AppTab.MEASURE -> MeasureScreen(state.measure, liveLevelDb, onEvent, contentModifier)
             AppTab.RESULTS -> TabIntro(AppTab.RESULTS.labelRes, R.string.results_intro, contentModifier)
             AppTab.FIXES -> TabIntro(AppTab.FIXES.labelRes, R.string.fixes_intro, contentModifier)

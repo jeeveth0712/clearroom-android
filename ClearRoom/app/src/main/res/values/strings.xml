@@ -15,6 +15,70 @@
     <string name="fixes_intro">Try cheap changes before spending money: curtains, switching off fans, moving the speaker or using a microphone. ClearRoom predicts how much each one helps.</string>
     <string name="log_intro">Leave the phone in the room to see how background noise changes through the day. Only sound levels are kept, never audio.</string>
 
+    <!-- Room tab (FR-1) -->
+    <string name="room_new">New room</string>
+    <string name="room_load_sample">Load sample room</string>
+    <string name="room_details">Room details</string>
+    <string name="room_field_name">Room name</string>
+    <string name="room_field_length">Length (m)</string>
+    <string name="room_field_width">Width (m)</string>
+    <string name="room_field_height">Height (m)</string>
+    <string name="room_field_rows">Rows of seats</string>
+    <string name="room_field_cols">Seats per row</string>
+    <string name="room_field_students">Students usually present</string>
+    <string name="room_surface_floor">Floor</string>
+    <string name="room_surface_walls">Walls</string>
+    <string name="room_surface_ceiling">Ceiling</string>
+    <string name="room_save">Save room</string>
+    <string name="room_problem_missing">Required</string>
+    <string name="room_problem_not_a_number">Enter a number</string>
+    <string name="room_problem_range">Between %1$s and %2$s</string>
+    <plurals name="room_problem_name_too_long">
+        <item quantity="one">At most %d character</item>
+        <item quantity="other">At most %d characters</item>
+    </plurals>
+    <string name="room_notice_saved">Room saved.</string>
+    <string name="room_notice_sample_loaded">Sample room loaded. Save it to keep your own copy.</string>
+    <string name="room_notice_save_failed">Couldn\'t save the room. Check the phone has free storage, then try again.</string>
+    <string name="room_notice_open_failed">That room\'s file couldn\'t be read.</string>
+    <string name="room_notice_deleted">Room deleted.</string>
+    <string name="room_plan_title">Floor plan</string>
+    <string name="room_plan_hint">The front of the room, with the speaker, is at the top.</string>
+    <string name="room_plan_missing">Fill in the size and seats to see the floor plan.</string>
+    <!-- %3$s is room_plan_rows, %4$s is room_plan_seats_per_row -->
+    <string name="room_plan_description">Floor plan, %1$s by %2$s metres: %3$s of %4$s, speaker at the front.</string>
+    <plurals name="room_plan_rows">
+        <item quantity="one">%d row</item>
+        <item quantity="other">%d rows</item>
+    </plurals>
+    <plurals name="room_plan_seats_per_row">
+        <item quantity="one">%d seat</item>
+        <item quantity="other">%d seats</item>
+    </plurals>
+    <string name="room_saved_title">Saved rooms</string>
+    <string name="room_saved_empty">No saved rooms yet.</string>
+    <string name="room_saved_size">%1$s × %2$s m</string>
+    <string name="room_saved_open_now">Open now</string>
+    <string name="room_saved_damaged">Damaged room file</string>
+    <string name="room_delete">Delete</string>
+    <string name="room_delete_title">Delete this room?</string>
+    <string name="room_delete_body">Its measurements are deleted too. This can\'t be undone.</string>
+    <string name="room_delete_cancel">Keep it</string>
+    <plurals name="room_saved_seats">
+        <item quantity="one">%d seat</item>
+        <item quantity="other">%d seats</item>
+    </plurals>
+    <plurals name="room_saved_measured">
+        <item quantity="one">%d measured</item>
+        <item quantity="other">%d measured</item>
+    </plurals>
+    <string name="material_concrete">Concrete</string>
+    <string name="material_tile">Tile</string>
+    <string name="material_glass">Glass</string>
+    <string name="material_wood">Wood</string>
+    <string name="material_curtain">Curtain</string>
+    <string name="material_soft_board">Soft board</string>
+
     <!-- Microphone permission -->
     <string name="mic_why">ClearRoom needs the microphone to measure sound levels. It never records or stores speech.</string>
     <string name="mic_denied_can_ask_again">Without the microphone, ClearRoom can\'t measure the room. It only measures sound levels, never speech.</string>

@@ -1,0 +1,86 @@
+package com.clearroom.app.data
+
+import com.clearroom.app.testing.aMeasuredSeat
+import com.clearroom.app.testing.aRoom
+import com.clearroom.app.testing.flatBands
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
+
+class ModelsTest {
+
+    @Test
+    fun `band levels need exactly seven finite values`() {
+        assertFailsWith<IllegalArgumentException> { BandLevels(List(6) { -60.0 }) }
+        assertFailsWith<IllegalArgumentException> { BandLevels(List(8) { -60.0 }) }
+        assertFailsWith<IllegalArgumentException> { BandLevels(List(7) { Double.NaN }) }
+        assertFailsWith<IllegalArgumentException> { BandLevels(List(7) { Double.NEGATIVE_INFINITY }) }
+    }
+
+    @Test
+    fun `equal band levels are equal, so the UI sees an unchanged value as unchanged`() {
+        assertEquals(flatBands(-60.0), flatBands(-60.0))
+        assertEquals(Session(aRoom(), voice = flatBands(-30.0)), Session(aRoom(), voice = flatBands(-30.0)))
+    }
+
+    @Test
+    fun `room volume and surface area follow from its size`() {
+        val room = aRoom(lengthM = 9.0, widthM = 7.0, heightM = 3.2)
+        assertEquals(201.6, room.volumeM3, absoluteTolerance = 1e-9)
+        assertEquals(2 * (63.0 + 28.8 + 22.4), room.surfaceAreaM2, absoluteTolerance = 1e-9)
+        assertEquals(30, aRoom(rows = 5, cols = 6).seatCount)
+    }
+
+    @Test
+    fun `impossible rooms are rejected`() {
+        assertFailsWith<IllegalArgumentException> { aRoom(id = " ") }
+        assertFailsWith<IllegalArgumentException> { aRoom(lengthM = 0.0) }
+        assertFailsWith<IllegalArgumentException> { aRoom(widthM = -7.0) }
+        assertFailsWith<IllegalArgumentException> { aRoom(heightM = Double.NaN) }
+        assertFailsWith<IllegalArgumentException> { aRoom(rows = 0) }
+        assertFailsWith<IllegalArgumentException> { aRoom(cols = 0) }
+        assertFailsWith<IllegalArgumentException> { aRoom(students = -1) }
+    }
+
+    @Test
+    fun `an RT60 take has seven bands, null where a band was rejected`() {
+        RtTake(listOf(null, 1.2, 1.1, 1.0, 0.9, 0.8, null)) // fine
+        assertFailsWith<IllegalArgumentException> { RtTake(List(6) { 1.0 }) }
+        assertFailsWith<IllegalArgumentException> { RtTake(List(7) { 0.0 }) }
+        assertFailsWith<IllegalArgumentException> { RtTake(List(7) { Double.POSITIVE_INFINITY }) }
+    }
+
+    @Test
+    fun `seat positions can't be negative`() {
+        assertFailsWith<IllegalArgumentException> { SeatMeasure(row = -1, col = 0) }
+        assertFailsWith<IllegalArgumentException> { SeatMeasure(row = 0, col = -1) }
+    }
+
+    @Test
+    fun `a session can't measure seats outside the grid or the same seat twice`() {
+        val room = aRoom(rows = 2, cols = 2)
+        assertFailsWith<IllegalArgumentException> { Session(room, seats = listOf(aMeasuredSeat(2, 0))) }
+        assertFailsWith<IllegalArgumentException> { Session(room, seats = listOf(aMeasuredSeat(0, 2))) }
+        assertFailsWith<IllegalArgumentException> { Session(room, seats = listOf(aMeasuredSeat(1, 1), aMeasuredSeat(1, 1))) }
+    }
+
+    @Test
+    fun `changing the room keeps seats that still exist and the voice reference`() {
+        val session = Session(
+            room = aRoom(rows = 5, cols = 6),
+            voice = flatBands(-30.0),
+            seats = listOf(aMeasuredSeat(0, 0), aMeasuredSeat(4, 0), aMeasuredSeat(0, 5)),
+        )
+        val smaller = session.withRoom(aRoom(rows = 3, cols = 4))
+        assertEquals(listOf(aMeasuredSeat(0, 0)), smaller.seats)
+        assertEquals(flatBands(-30.0), smaller.voice)
+        assertEquals(3, smaller.room.rows)
+    }
+
+    @Test
+    fun `saved-room entries expose their id whether readable or damaged`() {
+        val summary = RoomSummary("a", "A", 9.0, 7.0, 30, 0, savedAtMillis = 1)
+        assertEquals("a", SavedRoom.Readable(summary).id)
+        assertEquals("b", SavedRoom.Damaged("b").id)
+    }
+}
