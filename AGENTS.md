@@ -100,6 +100,7 @@ Skills (each `SKILL.md` is a focused how-to with the project's rules):
 **App configuration:**
 - Package `com.clearroom.app`; `minSdk 29`, `targetSdk 37`.
 - `testBuildType = "uiTest"`, with `applicationIdSuffix ".uitest"`, so on-phone tests install a separate app and **never wipe the owner's saved rooms**.
+- **APK size cap: 95 MB** (owner's rule). `ndk.abiFilters` keeps only `arm64-v8a` and `armeabi-v7a`: MediaPipe's native library is 10–21 MB per processor type, and x86/x86_64 alone added 38 MB. The `check<Variant>ApkSize` task in `app/build.gradle.kts` runs after every packaging and with `check`, and fails the build above 95,000,000 bytes. Sizes now: debug 65.5 MB, release 36.7 MB (was 105 and 75). Lint's `ChromeOsAbiSupport` is disabled for this, with the reason in the build file.
 
 **Command line (Git Bash).** Set these first:
 
@@ -325,6 +326,12 @@ All 15 views are built.
 | M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains) | to do |
 
 **Notes for M12:**
+- **Start with the redesign** (owner's decisions, 2026-10-27), inspired by the Dribbble shot "Crypto Trading Mobile App" (dribbble.com/shots/25559085). Dribbble blocks automated fetching, so ask the owner for a screenshot.
+  - Light by default; dark when the phone is in dark mode (both polished).
+  - Lime accent `#D4F25C` with black (`#111318`) pill buttons and nav bar; white cards on a soft grey background; big bold numbers for the verdicts.
+  - Font: **Manrope**, bundled (Google Fonts, OFL licence; a third-party download, so tell the owner when fetching it).
+  - The clarity band colours (`StiColors.kt`) never change, and nothing else may use red, orange or blue.
+  - Then do the rest of M12 in the new style.
 - Read `.claude/skills/bug-vulnerability-audit/SKILL.md` (and its checklists) first; the Semgrep MCP failed to connect in the M11 session, so check it or run `semgrep` another way, and name every scanner before using it.
 - Look for: empty states and error text on every tab, a real app icon (the template one is still in place), the app name, a signed release APK (signing keys stay out of git; ask the owner where to keep them).
 - The release build has `optimization { enable = true }`: check that MediaPipe, org.json and Compose still work in release (install the release APK and run the sample room, a clap, a day log and a report).
@@ -349,7 +356,9 @@ All 15 views are built.
    - a row is judged by its worst seat;
    - the sample can't be measured into; saving it copies the layout only;
    - day-log events: 10 s gap bridging, "other" excluded (seen on the phone: a fan's label flickers);
-   - re-measuring clears the seats and keeps the voice; the report lists only fixes worth +0.01 or more.
+   - re-measuring clears the seats and keeps the voice; the report lists only fixes worth +0.01 or more;
+   - APKs stay under 95 MB, for ARM phones only (section 4);
+   - the M12 look: light + dark, lime on black, Manrope (section 9).
 8. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
 
 ## 11. Testing
