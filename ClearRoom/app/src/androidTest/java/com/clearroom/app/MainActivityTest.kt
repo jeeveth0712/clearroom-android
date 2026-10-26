@@ -14,9 +14,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * End-to-end on the real activity: the real permission plumbing (rememberMicPermission) must
- * notice a granted microphone and show "ready". The denied paths need the system dialog, so they
- * are covered by MeasureContentTest plus a manual check on the phone.
+ * End-to-end on the real activity, ViewModel and recorder: the real permission plumbing
+ * (rememberMicPermission) must notice a granted microphone and offer the recorder. The denied
+ * paths need the system dialog, so they're covered by MeasureContentTest plus a manual check.
  */
 @RunWith(AndroidJUnit4::class)
 class MainActivityTest {
@@ -35,9 +35,19 @@ class MainActivityTest {
     }
 
     @Test
-    fun measureTab_withMicrophoneGranted_showsReady() {
+    fun measureTab_withMicrophoneGranted_offersTheRecorder() {
         compose.onNode(hasText(text(R.string.tab_measure)) and hasClickAction()).performClick()
-        compose.onNodeWithText(text(R.string.mic_ready)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.recorder_title)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.recorder_start)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.mic_allow)).assertDoesNotExist()
+    }
+
+    @Test
+    fun startingATestRecording_beginsTheCountdown() {
+        compose.onNode(hasText(text(R.string.tab_measure)) and hasClickAction()).performClick()
+        compose.onNodeWithText(text(R.string.recorder_start)).performClick()
+        compose.onNodeWithText(text(R.string.recorder_cancel)).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.recorder_cancel)).performClick() // leave the mic untouched
+        compose.onNodeWithText(text(R.string.recorder_start)).assertIsDisplayed()
     }
 }

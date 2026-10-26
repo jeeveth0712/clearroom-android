@@ -19,7 +19,29 @@
     <string name="mic_why">ClearRoom needs the microphone to measure sound levels. It never records or stores speech.</string>
     <string name="mic_denied_can_ask_again">Without the microphone, ClearRoom can\'t measure the room. It only measures sound levels, never speech.</string>
     <string name="mic_denied_permanently">Microphone access is turned off for ClearRoom. Turn it on in Settings, under Permissions.</string>
-    <string name="mic_ready">Microphone ready. Clap tests and noise checks arrive in the next build.</string>
     <string name="mic_allow">Allow microphone</string>
     <string name="mic_open_settings">Open settings</string>
+
+    <!-- Microphone test (M2): proves the recorder before clap tests arrive -->
+    <string name="recorder_title">Test the microphone</string>
+    <string name="recorder_idle_hint">Records 5 seconds after a short countdown. Talk or clap to see the level bar move.</string>
+    <string name="recorder_start">Start test recording</string>
+    <string name="recorder_again">Record again</string>
+    <string name="recorder_cancel">Cancel</string>
+    <string name="recorder_countdown">Starting in %1$d…</string>
+    <string name="recorder_recording">Recording for %1$.0f seconds…</string>
+    <string name="recorder_level_label">Sound level</string>
+    <plurals name="recorder_summary">
+        <item quantity="one">Recorded %1$.1f s at %2$d sample per second, using the %3$s.</item>
+        <item quantity="other">Recorded %1$.1f s at %2$d samples per second, using the %3$s.</item>
+    </plurals>
+    <string name="recorder_loudness">Loudest moment %1$.0f dB, average %2$.0f dB (relative to the phone\'s maximum).</string>
+    <string name="source_unprocessed">raw microphone (best for measuring)</string>
+    <string name="source_voice_recognition">speech microphone (no automatic volume)</string>
+    <string name="quality_ok">The recording looks clean.</string>
+    <string name="quality_clipped">Too loud: the sound overloaded the microphone. Clap softer or step back.</string>
+    <string name="quality_silent">No sound came through. Another app may be using the microphone, or it\'s muted.</string>
+    <string name="problem_mic_unavailable">Couldn\'t open the microphone. Close other apps that use it, then try again.</string>
+    <string name="problem_permission_revoked">Microphone access was turned off. Allow it again to measure.</string>
+    <string name="problem_read_failed">The recording stopped unexpectedly. Please try again.</string>
 </resources>

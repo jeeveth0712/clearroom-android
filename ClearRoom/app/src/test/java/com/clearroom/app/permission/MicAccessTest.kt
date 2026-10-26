@@ -2,8 +2,6 @@ package com.clearroom.app.permission
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class MicAccessTest {
 
@@ -28,13 +26,5 @@ class MicAccessTest {
                 "granted=$granted rationale=$rationale asked=$asked",
             )
         }
-    }
-
-    @Test
-    fun `system dialog can be shown only before asking or after a single denial`() {
-        assertTrue(MicAccess.NOT_ASKED.canRequest)
-        assertTrue(MicAccess.DENIED_CAN_ASK_AGAIN.canRequest)
-        assertFalse(MicAccess.GRANTED.canRequest)
-        assertFalse(MicAccess.DENIED_PERMANENTLY.canRequest)
     }
 }

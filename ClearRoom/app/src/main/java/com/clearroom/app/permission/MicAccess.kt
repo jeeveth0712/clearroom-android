@@ -10,9 +10,6 @@ enum class MicAccess {
     /** The system won't show its dialog any more; only the app's Settings page can grant it. */
     DENIED_PERMANENTLY;
 
-    /** True when tapping "Allow microphone" will open the system permission dialog. */
-    val canRequest: Boolean get() = this == NOT_ASKED || this == DENIED_CAN_ASK_AGAIN
-
     companion object {
         /**
          * Android exposes no "permanently denied" flag. When the permission isn't granted and no

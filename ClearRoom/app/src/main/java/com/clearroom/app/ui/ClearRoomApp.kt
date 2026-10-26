@@ -21,9 +21,17 @@ import com.clearroom.app.ui.screens.MeasureScreen
 import com.clearroom.app.ui.screens.TabIntro
 import com.clearroom.app.ui.theme.ClearRoomTheme
 
-/** App shell: bottom navigation over the five tabs. The selected tab survives rotation. */
+/**
+ * App shell: bottom navigation over the five tabs. Stateless apart from the selected tab, which
+ * survives rotation; data comes in as [state] and user actions go out through [onEvent].
+ */
 @Composable
-fun ClearRoomApp(modifier: Modifier = Modifier) {
+fun ClearRoomApp(
+    state: UiState,
+    liveLevelDb: () -> Double,
+    onEvent: (UiEvent) -> Unit,
+    modifier: Modifier = Modifier,
+) {
     var selectedTab by rememberSaveable { mutableStateOf(AppTab.ROOM) }
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -32,7 +40,7 @@ fun ClearRoomApp(modifier: Modifier = Modifier) {
         val contentModifier = Modifier.padding(innerPadding)
         when (selectedTab) {
             AppTab.ROOM -> TabIntro(AppTab.ROOM.labelRes, R.string.room_intro, contentModifier)
-            AppTab.MEASURE -> MeasureScreen(contentModifier)
+            AppTab.MEASURE -> MeasureScreen(state.measure, liveLevelDb, onEvent, contentModifier)
             AppTab.RESULTS -> TabIntro(AppTab.RESULTS.labelRes, R.string.results_intro, contentModifier)
             AppTab.FIXES -> TabIntro(AppTab.FIXES.labelRes, R.string.fixes_intro, contentModifier)
             AppTab.LOG -> TabIntro(AppTab.LOG.labelRes, R.string.log_intro, contentModifier)
@@ -58,5 +66,5 @@ private fun AppNavigationBar(selected: AppTab, onTabSelected: (AppTab) -> Unit) 
 @Preview(showBackground = true)
 @Composable
 private fun ClearRoomAppPreview() {
-    ClearRoomTheme { ClearRoomApp() }
+    ClearRoomTheme { ClearRoomApp(state = UiState(), liveLevelDb = { -60.0 }, onEvent = {}) }
 }

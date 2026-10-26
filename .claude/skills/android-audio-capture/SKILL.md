@@ -73,11 +73,13 @@ Turn off any effect the platform attached, and keep references so you can releas
 
 ```kotlin
 private fun disableEffects(session: Int): List<AudioEffect> = buildList {
-    if (AutomaticGainControl.isAvailable()) AutomaticGainControl.create(session)?.let { it.enabled = false; add(it) }
-    if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(session)?.let { it.enabled = false; add(it) }
-    if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(session)?.let { it.enabled = false; add(it) }
+    if (AutomaticGainControl.isAvailable()) AutomaticGainControl.create(session)?.let { it.setEnabled(false); add(it) }
+    if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(session)?.let { it.setEnabled(false); add(it) }
+    if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(session)?.let { it.setEnabled(false); add(it) }
 }
 ```
+
+`AudioEffect.setEnabled()` returns a status code, so Kotlin can't treat it as an `enabled = false` property: call the method. Some devices throw when an effect is touched; catch `RuntimeException`, release that effect and carry on. ClearRoom's `audio/Recorder.kt` has the working version.
 
 ## The read loop
 
@@ -102,7 +104,7 @@ override suspend fun record(seconds: Double): AudioClip = withContext(Dispatcher
         }
         AudioClip(out, record.sampleRate)
     } finally {
-        runCatching { record.stop() }   // throws IllegalStateException if it never started
+        try { record.stop() } catch (e: IllegalStateException) { }   // it never started
         effects.forEach { it.release() }
         record.release()
     }
