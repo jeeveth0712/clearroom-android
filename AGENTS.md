@@ -4,8 +4,8 @@ Read this first. It is the complete handover: what the project is, how the owner
 done, where everything is, what has been built, what is decided, what is still open, and the traps
 already hit. It is kept in the repository so it works from any account or tool.
 
-- **Last updated:** 2026-10-27, after milestone **M10** (commit `6bf1863`).
-- **Next step:** milestone **M11 — PDF report + share, before/after** (section 9).
+- **Last updated:** 2026-10-27, after milestone **M11** (commit `8c50b31`).
+- **Next step:** milestone **M12 — finish and audit** (section 9).
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
 
@@ -133,18 +133,19 @@ cd ClearRoom
 ## 5. Architecture
 
 **Packages:**
-- **Engine (pure Kotlin, no `android.*`, `androidx.*` or `org.json` imports):** `dsp/`, `acoustics/`, `measure/`, `data/Models.kt`, `daylog/`, `viz/math3d/`. Tested on the plain JVM.
-- **Android and UI:** `audio/` (including `YamnetLabeller.kt`), `data/Store.kt` + `RoomJson.kt` (org.json, AtomicFile), `permission/`, `ui/`, `viz/` (Compose).
+- **Engine (pure Kotlin, no `android.*`, `androidx.*` or `org.json` imports):** `dsp/`, `acoustics/`, `measure/`, `data/Models.kt`, `daylog/`, `report/Report.kt`, `viz/math3d/`. Tested on the plain JVM.
+- **Android and UI:** `audio/` (including `YamnetLabeller.kt`), `data/Store.kt` + `RoomJson.kt` (org.json, AtomicFile), `permission/`, `report/` (the rest: words, page, PDF writer, sharing), `ui/`, `viz/` (Compose).
 
 **Data flow:**
 - `MainActivity` creates the `AppViewModel` through `AppContainer`, the composition root (Recorder, JsonRoomStore, dispatchers).
 - `AppViewModel` holds a single `MutableStateFlow<UiState>` (session, room form, measure, fixes). The screens are stateless and send `UiEvent`s to `vm.onEvent`.
 - Derived flows are computed on the DSP dispatcher, and each result carries the inputs it came from, so screens never mix one room's results with another room:
-  - `vm.clarity: StateFlow<Evaluation?>`, where `Evaluation(session, result: ClarityResult, grid: ClarityGrid?)` comes from `Evaluation.of(session)`.
+  - `vm.clarity: StateFlow<Evaluation?>`, where `Evaluation(session, result: ClarityResult, grid: ClarityGrid?, before: Evaluation?)` comes from `Evaluation.of(session)`; `before` is the same room with the "before" readings while comparing (FR-13).
   - `vm.fixes: StateFlow<FixesView?>`, where `FixesView(session, settings, outcome)` comes from `FixesView.of(...)`. It uses `conflate()` because sliders change fast.
   - `vm.log: StateFlow<DayLogView?>`, where `DayLogView(log: DayLogState, logSpot, summary: LogSummary?)` combines the day-log controller's state with the session and the picked seat.
   - `vm.liveLevelDb` is kept separate, so the level meter doesn't recompose the app.
 - `ClearRoomApp`: a `Scaffold` with 5 tabs (Room, Measure, Results, Fixes, Log). The selected tab is kept with `rememberSaveable`. While a day log runs, `KeepScreenOn` holds the screen on app-wide.
+- **Report (FR-12):** `UiEvent.ShareReport` → `UiState.report` goes `Writing` → `Ready(file)` (or `Failed`); `ClearRoomApp`'s `ShareReport` effect opens the share sheet once and sends `UiEvent.ReportShown`. The ViewModel builds `Report.of(session, clock())` on the DSP dispatcher and calls the injected `ReportWriter` on IO.
 - **One recording at a time:** the day log and a measurement share the microphone. A measurement is refused while a log runs (`CaptureProblem.IN_USE_BY_DAY_LOG`) and Start log is disabled while measuring. Opening or creating another room stops the log; deleting a room deletes its logs.
 
 **Key files:**
@@ -173,8 +174,14 @@ cd ClearRoom
   - `daylog/LogStore.kt`: `CsvLogStore` (`filesDir/logs/<roomId>/<start>.csv`).
   - `daylog/DayLogController.kt`: start, stop, show the latest log, clear.
   - `audio/YamnetLabeller.kt`: MediaPipe wrapper; `create()` returns null if the model can't load, and the log keeps levels only.
+- **Report (M11):**
+  - `report/Report.kt` (pure): `Report.of(session, millis)` with `now`/`before: ReportSide` (clarity, grid, `Rt60ChartModel`), `topFixes` (gain ≥ `MIN_GAIN` 0.01, at most 3), `ReportConditions`, `echoAxisTopS` (one scale for both sides); the `ReportWriter` interface.
+  - `report/ReportText.kt`: every line of the page from strings.xml; `kiloHertz()`.
+  - `report/ReportPage.kt`: `drawReport()` lays out one A4 page (595 × 842 pt, density 1) and returns whether it fitted; the charts are `drawSeatMap` / `drawRt60Chart` inside `inset(...)` boxes, styled by `ChartStyle.print()`.
+  - `report/PdfReportWriter.kt`: `PdfDocument` + `CanvasDrawScope`; keeps only the newest report in `cache/reports/`; `ReportSharing.chooser()` builds the share intent.
+  - Shared words: `rangeText(resources, …)` in `ResultsParts.kt`, `rt60Caption(resources, model)` in `Rt60Chart.kt`; `FixPreset.nameRes`, `CostTier.textRes`, `signedSti`, `FanState.labelRes` are `internal`.
 - **UI:**
-  - `ui/screens/`: `RoomScreen`, `MeasureScreen`, `ResultsScreen`, `FixesScreen`, `LogScreen`, plus `ResultsParts.kt` (shared cards and band/cause wording).
+  - `ui/screens/`: `RoomScreen`, `MeasureScreen`, `ResultsScreen`, `FixesScreen`, `LogScreen`, plus `ResultsParts.kt` (shared cards, band/cause wording, and `ConfirmFirst`, a button that asks before it acts).
   - `ui/theme/`: `StiColors.kt` (fixed band colours), `SceneColors.kt` (3D palette).
 - **Visualizations:**
   - 2D: `viz/ChartKit.kt` (Axis with nice ticks, `drawFrame`, `ChartStyle`, `ChartColors`, `decimals()`), `SeatMap.kt`, `Rt60Chart.kt`, `DecayChart.kt`, `SeatCharts.kt` (V13–V15), `FixCharts.kt` (V6, V7), `DayLogCharts.kt` (V5, clock times, sound-label colours), `RoomPlan.kt`.
@@ -230,6 +237,8 @@ cd ClearRoom
 - Back-row STI per period (FR-10): each period's per-band change versus the noise snapshot at the log seat is applied to every measured seat, then the engine runs again.
 - Approximate dBA on the Log tab = dBFS + 112.35, always labelled "about".
 
+**Before and after (FR-13):** `Session.startRemeasuring(millis)` moves the seats into `Baseline` (voice kept) and leaves "after" empty; `Session.before` is the room with the "before" readings; `endComparison()` drops "before", or restores it if nothing new was measured.
+
 **Fixes (`Fixes.kt`):**
 - Curtains use the doc's α table: 0.14, 0.35, 0.55, 0.72, 0.70, 0.65, 0.65.
 - Each student adds 0.15, 0.25, 0.35, 0.45, 0.50, 0.50, 0.50 m² of absorption per band.
@@ -250,6 +259,8 @@ The **Implementation notes** in the requirements doc list every deviation with i
 - Non-finite numbers are written as `null`. Older files without `lastClap` still load, and damaged curves are dropped without losing the room.
 - The sample room is never written to disk. "Save" on the sample copies only its layout, with a new id (a bug once copied its made-up readings).
 - Day logs are stored one per file at `filesDir/logs/<roomId>/<start millis>.csv`: one line per second (time, 7 band levels, label word), flushed every 60 s. A cut-off last line is skipped on reading; room ids are checked against `[A-Za-z0-9-]{1,64}` before they become a folder name.
+- Room files also hold `mic` (input and sample rate of the latest reading) and `baseline` (the "before" readings while comparing). Both are optional at schema 1: older files load without them, and a damaged one is dropped without losing the room.
+- Reports: `cacheDir/reports/ClearRoom-report-<yyyyMMdd-HHmm>.pdf`, newest only. The FileProvider (`${applicationId}.fileprovider`, `res/xml/file_paths.xml`) exposes only that folder, never `files/` (rooms, logs).
 - No audio is ever stored (NFR-6), only numbers and labels. There is no INTERNET permission.
 
 ## 8. Screens and views
@@ -261,12 +272,15 @@ The **Implementation notes** in the requirements doc list every deviation with i
   - the clap test (3 takes; RT60 table per band);
   - noise (30 s, with the fan state);
   - voice (20 s);
-  - "Clear this seat's readings".
+  - "Clear this seat's readings";
+  - while re-measuring, a note that new readings fill in "after".
 - **Results:**
-  - a verdict card;
+  - a verdict card with "Share report (PDF)";
+  - while comparing, a "Before and after" card (back rows and echo time before → after, the two seat maps side by side, the two echo charts on one scale, "Stop comparing");
   - a 3D room / seat map / cause map toggle;
   - seat details with V15 (tap a seat; the tab opens on the worst back-row seat);
-  - cards for V9, V3, V4, V10, V13 and V14.
+  - cards for V9, V3, V4, V10, V13 and V14;
+  - at the end, "Made a change?" with "Re-measure after a change" (own rooms only, after a confirmation).
 - **Fixes:**
   - a before/after summary;
   - V12;
@@ -290,6 +304,8 @@ The **Implementation notes** in the requirements doc list every deviation with i
 
 All 15 views are built.
 
+**The PDF report** (one A4 page): title, room, date and size (plus a "made-up readings" line for the sample); back-row verdict with range and cause, front rows, before → after while comparing; seat map (two maps while comparing) with the band ranges as legend; echo time by pitch (two charts on one scale while comparing); the best fixes with gain range and cost, plus the echo note; how it was measured; a footer explaining the 0–1 scale and that it is not a compliance test.
+
 ## 9. Milestones
 
 | # | Milestone | Status / commit |
@@ -304,16 +320,15 @@ All 15 views are built.
 | M8 | Results tab: verdict, V1, V2, seat details, V3, V4, V9, V10, V13–V15 | done `4a63fda` |
 | M9 | Fixes tab: what-if controls, V12, V6, V7 | done `76e3515` |
 | M10 | Log tab: day noise log (1 s band levels), YAMNet labels, keep-screen-on, V5, V11, clear logs | done `6bf1863` |
-| **M11** | **PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13)** | **next** |
-| M12 | Finish: empty states, error text, app icon, release APK; full bug and vulnerability audit | to do |
-| M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log) | to do |
+| M11 | PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13) | done `8c50b31` |
+| **M12** | **Finish: empty states, error text, app icon, release APK; full bug and vulnerability audit** | **next** |
+| M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains) | to do |
 
-**Notes for M11:**
-- Read `.claude/skills/storage-and-pdf-report/SKILL.md` first.
-- No new third-party library is planned: `PdfDocument`, `FileProvider` (androidx.core, already present) and the existing `DrawScope` chart functions.
-- The FileProvider exposes only `cache/reports/`; never the files root (rooms and logs live there).
-- Before/after: freeze the current results as a baseline, show V1 and V4 side by side on the same scale.
-- The doc's fallback order if time runs short: drop the PDF before the V12 animation (YAMNet labels are already built).
+**Notes for M12:**
+- Read `.claude/skills/bug-vulnerability-audit/SKILL.md` (and its checklists) first; the Semgrep MCP failed to connect in the M11 session, so check it or run `semgrep` another way, and name every scanner before using it.
+- Look for: empty states and error text on every tab, a real app icon (the template one is still in place), the app name, a signed release APK (signing keys stay out of git; ask the owner where to keep them).
+- The release build has `optimization { enable = true }`: check that MediaPipe, org.json and Compose still work in release (install the release APK and run the sample room, a clap, a day log and a report).
+- Before the video, remind the owner not to screen-record with the phone's microphone on.
 
 ## 10. Decisions still open (owner's call; current default in bold)
 
@@ -324,20 +339,22 @@ All 15 views are built.
 2. **Distance model:** **classical Sabine field, built.** Barron's revised theory would make back rows a little worse; it was offered and the owner hasn't answered.
 3. **Fix costs in ₹:** the doc wants ₹ prices on V6. **The app shows free / low / medium cost** until the owner gives prices (for 20 m² of heavy curtains and a portable mic set).
 4. **Soft-board absorption:** there is no sourced α table, so **soft boards are left out** of the fixes. The same applies to tile, glass and wood (plan Part E #6). Surface tags aren't used by the engine, because the Sabine fit uses measured RT60.
-5. **Screen-off day logging (NFR-9):** **not built.** The screen stays on while a log runs (plan Part E, decision 3). Logging with the screen off needs a microphone foreground service and its notification; offer it only if the owner asks.
-6. Settled already:
+5. **Predicted vs measured change (testing table, "what-if realism"):** not built. The app shows before and after, but doesn't yet compare the measured change with the Fixes tab's prediction. Planned for the M13 curtain test.
+6. **Screen-off day logging (NFR-9):** **not built.** The screen stays on while a log runs (plan Part E, decision 3). Logging with the screen off needs a microphone foreground service and its notification; offer it only if the owner asks.
+7. Settled already:
    - noise snapshot 30 s;
    - clap rejection limit 30 dB;
    - ξ limit 40 ‰;
    - claps pooled per room;
    - a row is judged by its worst seat;
    - the sample can't be measured into; saving it copies the layout only;
-   - day-log events: 10 s gap bridging, "other" excluded (seen on the phone: a fan's label flickers).
-7. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
+   - day-log events: 10 s gap bridging, "other" excluded (seen on the phone: a fan's label flickers);
+   - re-measuring clears the seats and keeps the voice; the report lists only fixes worth +0.01 or more.
+8. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
 
 ## 11. Testing
 
-**Current counts:** 499 JVM tests, 101 device tests, lint 0 issues. All pass at `6bf1863`.
+**Current counts:** 530 JVM tests, 131 device tests, lint 0 issues. All pass at `8c50b31`.
 
 **Conventions:**
 - **Naming:** JVM tests use `kotlin.test` with backtick sentence names; androidTest uses camelCase names with JUnit4 and `createComposeRule` (v2).
@@ -345,7 +362,7 @@ All 15 views are built.
 - **Test helpers** (`app/src/test/java/com/clearroom/app/testing/`):
   - builders `aRoom()`, `aValidForm()`, `flatBands()`, `aMeasuredSeat()`;
   - `Signals.syntheticClap(t60S, seed)`;
-  - `FakeAudioInput` (also fakes `blocks()`), `InMemoryRoomRepository`, `InMemoryLogStore` + `ScriptedLabeller`, `MainDispatcherRule`.
+  - `FakeAudioInput` (also fakes `blocks()`), `InMemoryRoomRepository`, `InMemoryLogStore` + `ScriptedLabeller`, `FakeReportWriter`, `MainDispatcherRule`.
 - **ViewModel tests:**
   - `startApp()` creates the ViewModel and runs its startup.
   - `startWithRoom(...)` saves room "r1" first.
@@ -354,6 +371,8 @@ All 15 views are built.
 - **Device tests:**
   - Scroll before asserting: `performScrollTo()` for `verticalScroll` columns, `performScrollToNode` only in lazy lists.
   - Resolve strings with `context.getString` or `getQuantityString`.
+  - A dialog's buttons can share text with the button that opened it: match with `hasAnyAncestor(isDialog())` (or its negation).
+  - PDF tests render the page with `PdfRenderer` and look for the band colours; `drawReport` on a bitmap returns whether the page fitted.
 - **Untested-function check:** `python -I .claude/skills/test-every-function/scripts/find_untested.py --main ClearRoom/app/src/main/java --tests ClearRoom/app/src/test/java ClearRoom/app/src/androidTest/java`. Composables covered by screen tests are an accepted exception.
 
 ## 12. Traps already hit (don't repeat them)
@@ -379,6 +398,11 @@ All 15 views are built.
 
 **Tooling and phone:**
 - In Git Bash, heredocs containing `'` or `\'` break. Write a Python script to a file and run it with `python -I` (see `tools/`).
+- `tools/sort_imports.py` and `tools/unused_imports.py` rewrite every file they're given (line endings too): pass **only the files you changed**, then check `git status` for strays.
+- `tools/tap_text.py` finds adb through `ANDROID_HOME`: `export ANDROID_HOME="D:/Android/Sdk"` first, or it fails with "file not found". It matches the whole text exactly.
+- The owner sometimes uses the phone while you script it (in M11 the app jumped to another room and tab between two steps). Check the screen before each tap, and ask if it changes under you.
+- Claude Code's safety check refuses wildcard deletes inside `sh -c` (for example in `run-as`); delete files by their exact names.
+- The Read tool can't render PDFs here (no poppler). To look at a report: `adb exec-out run-as com.clearroom.app cat cache/reports/<name>.pdf > report.pdf`, then render it with **pypdfium2** in a throwaway venv (third-party from PyPI: say so first).
 - When writing a file that changed on disk since you last read it, read it again first.
 - The app reopens on the **last tab**, so tap the Room tab before "Load sample room" when scripting taps.
 - **The phone:** connect by service name, keep it unlocked, check the call state (section 4).
@@ -410,6 +434,6 @@ Other tools:
 ## 14. Resuming: checklist
 
 1. `git pull`; read this file, then the requirements doc's Implementation notes, then the skill for the next milestone.
-2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 499 JVM + 101 device tests.
+2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 530 JVM + 131 device tests.
 3. Tell the owner what you're about to build, and which third-party tools it needs.
 4. Follow the milestone loop (section 2). At the end, update this file's "Last updated" line, sections 8–11 and the commit table.
