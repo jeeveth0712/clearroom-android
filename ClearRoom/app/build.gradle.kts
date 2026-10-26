@@ -42,6 +42,10 @@ android {
     buildFeatures {
         compose = true
     }
+    androidResources {
+        // MediaPipe maps the YAMNet model straight out of the APK, which needs it stored uncompressed.
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -56,6 +60,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.mediapipe.tasks.audio)
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)

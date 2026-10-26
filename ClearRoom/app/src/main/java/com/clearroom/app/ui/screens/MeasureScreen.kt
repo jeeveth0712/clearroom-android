@@ -264,7 +264,7 @@ private fun StatusCard(phase: MeasurePhase, liveLevelDb: () -> Double, onCancel:
 }
 
 @Composable
-private fun MicAccessCard(@StringRes message: Int, @StringRes action: Int, onAction: () -> Unit) {
+internal fun MicAccessCard(@StringRes message: Int, @StringRes action: Int, onAction: () -> Unit) {
     InfoCard {
         BodyText(message)
         Button(onClick = onAction) { Text(stringResource(action)) }
@@ -301,10 +301,11 @@ private fun ClapProblem.messageRes(): Int = when (this) {
 }
 
 @StringRes
-private fun CaptureProblem.messageRes(): Int = when (this) {
+internal fun CaptureProblem.messageRes(): Int = when (this) {
     CaptureProblem.MIC_UNAVAILABLE -> R.string.problem_mic_unavailable
     CaptureProblem.PERMISSION_REVOKED -> R.string.problem_permission_revoked
     CaptureProblem.READ_FAILED -> R.string.problem_read_failed
+    CaptureProblem.IN_USE_BY_DAY_LOG -> R.string.problem_day_log_running
 }
 
 private class MeasurePreviews : PreviewParameterProvider<Pair<MicAccess, MeasureUiState>> {

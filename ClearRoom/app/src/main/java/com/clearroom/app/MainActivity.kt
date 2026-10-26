@@ -24,9 +24,10 @@ class MainActivity : ComponentActivity() {
                 val state by viewModel.state.collectAsStateWithLifecycle()
                 val evaluation by viewModel.clarity.collectAsStateWithLifecycle()
                 val fixes by viewModel.fixes.collectAsStateWithLifecycle()
+                val log by viewModel.log.collectAsStateWithLifecycle()
                 // Not unwrapped here: only the level bar reads it, so level updates don't recompose the app.
                 val liveLevelDb = viewModel.liveLevelDb.collectAsStateWithLifecycle()
-                ClearRoomApp(state = state, evaluation = evaluation, fixes = fixes, liveLevelDb = { liveLevelDb.value }, onEvent = viewModel::onEvent)
+                ClearRoomApp(state = state, evaluation = evaluation, fixes = fixes, log = log, liveLevelDb = { liveLevelDb.value }, onEvent = viewModel::onEvent)
             }
         }
     }

@@ -9,6 +9,8 @@ import com.clearroom.app.dsp.SILENCE_DB
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.take
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
@@ -89,5 +91,22 @@ class AndroidRecorderTest {
         )
         assertTrue("sound was captured but the level never moved: $levels", levels.any { it > SILENCE_DB })
         assertEquals(SILENCE_DB, recorder.liveLevelDb.value, 0.0)
+    }
+
+    @Test
+    fun blocks_streamWholeSecondsBackToBack_fromOneOpenMicrophone() = runBlocking {
+        val blocks = withTimeout(5_000) { recorder.blocks(1.0).take(2).toList() }
+        assertEquals(2, blocks.size)
+        blocks.forEach { block ->
+            assertEquals(block.sampleRate, block.samples.size)
+            assertTrue("non-finite sample found", block.samples.all { it.isFinite() })
+        }
+    }
+
+    @Test
+    fun blocks_releaseTheMicrophone_whenTheCollectorStops() = runBlocking {
+        withTimeout(5_000) { recorder.blocks(0.5).take(1).toList() }
+        val after = recorder.record(0.3) // would fail if the stream still held the microphone
+        assertEquals((0.3 * after.info.sampleRate).roundToInt(), after.clip.samples.size)
     }
 }

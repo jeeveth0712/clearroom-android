@@ -15,6 +15,9 @@ import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.daylog.DayLogState
+import com.clearroom.app.daylog.LogStats
+import com.clearroom.app.daylog.LogSummary
 import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
 
@@ -50,6 +53,18 @@ data class FixesView(val session: Session, val settings: FixSettings, val outcom
     companion object {
         /** Does the maths: call it off the main thread. */
         fun of(session: Session, settings: FixSettings) = FixesView(session, settings, Fixes.outcome(session, settings))
+    }
+}
+
+/** The Log tab: the controller's state plus its summary, worked out from the same seconds (like [Evaluation]). */
+data class DayLogView(val log: DayLogState, val logSpot: SeatId?, val summary: LogSummary?) {
+    companion object {
+        /** Does the maths: call it off the main thread. */
+        fun of(log: DayLogState, session: Session?, picked: SeatId?): DayLogView {
+            val forThisRoom = session?.takeIf { it.room.id == log.roomId }
+            val spot = forThisRoom?.let { LogStats.logSpot(it, picked) }
+            return DayLogView(log, spot, LogSummary.of(log.seconds, forThisRoom, spot))
+        }
     }
 }
 
@@ -121,4 +136,8 @@ sealed interface UiEvent {
 
     data class FixesChanged(val settings: FixSettings) : UiEvent
     data object ResetFixes : UiEvent
+
+    data object StartLog : UiEvent
+    data object StopLog : UiEvent
+    data object ClearLogs : UiEvent
 }

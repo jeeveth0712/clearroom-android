@@ -210,14 +210,19 @@ fun EchoWaterfall3D(curves: ClapCurves, labels: WaterfallLabels, description: St
             (curves.waterfallDb.size - 1) * EchoWaterfallScene.METRES_PER_BAND,
             EchoWaterfallScene.HEIGHT_M,
         )
-        // Ridges read best from in front, slightly to the left and lower; their near ends come close,
-        // so step back further than for a room.
-        room.copy(yawRad = WATERFALL_YAW_RAD, pitchRad = WATERFALL_PITCH_RAD, distanceM = room.distanceM * WATERFALL_DISTANCE_FACTOR)
+        room.chartView()
     }
     FramedScene3D(geometry, home, description, modifier)
 }
 
 private const val WHITE = 0xFFFFFFFF.toInt()
-private const val WATERFALL_YAW_RAD = -20.0 * PI / 180
-private const val WATERFALL_PITCH_RAD = 32.0 * PI / 180
-private const val WATERFALL_DISTANCE_FACTOR = 1.35
+private const val CHART_YAW_RAD = -20.0 * PI / 180
+private const val CHART_PITCH_RAD = 32.0 * PI / 180
+private const val CHART_DISTANCE_FACTOR = 1.35
+
+/**
+ * The view for 3D charts with time running left to right (V10, V11): from in front, slightly to
+ * the left and lower than a room view. Their near ends come close, so it steps back further.
+ */
+internal fun OrbitCamera.chartView(): OrbitCamera =
+    copy(yawRad = CHART_YAW_RAD, pitchRad = CHART_PITCH_RAD, distanceM = distanceM * CHART_DISTANCE_FACTOR)

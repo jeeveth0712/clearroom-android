@@ -1,7 +1,7 @@
 package com.clearroom.app
 
-import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
@@ -14,16 +14,21 @@ import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.SeatMeasure
 import com.clearroom.app.data.Session
-import com.clearroom.app.measure.MeasurementRunner
+import com.clearroom.app.daylog.LogSecond
+import com.clearroom.app.daylog.SoundLabel
 import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
+import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.testing.FakeAudioInput
+import com.clearroom.app.testing.InMemoryLogStore
 import com.clearroom.app.testing.InMemoryRoomRepository
 import com.clearroom.app.testing.MainDispatcherRule
+import com.clearroom.app.testing.ScriptedLabeller
 import com.clearroom.app.testing.Signals
 import com.clearroom.app.testing.aMeasuredSeat
 import com.clearroom.app.testing.aRoom
 import com.clearroom.app.testing.aValidForm
+import com.clearroom.app.testing.flatBands
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.UiEvent
@@ -37,6 +42,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Rule
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
@@ -51,9 +57,14 @@ class AppViewModelTest {
 
     private val audio = FakeAudioInput()
     private val rooms = InMemoryRoomRepository()
+    private val logs = InMemoryLogStore()
+    private val labeller = ScriptedLabeller(List(100) { SoundLabel.FAN })
     private var idCounter = 0
 
-    private fun newViewModel() = AppViewModel(audio, rooms, dsp = main.dispatcher, newRoomId = { "new-${++idCounter}" })
+    private fun newViewModel() = AppViewModel(
+        audio, rooms, logs, { labeller },
+        dsp = main.dispatcher, io = main.dispatcher, clock = { 1_000_000L }, newRoomId = { "new-${++idCounter}" },
+    )
 
     private val viewModel by lazy { newViewModel() }
     private val phase get() = viewModel.state.value.measure.phase
@@ -623,5 +634,88 @@ class AppViewModelTest {
     fun `with no room open there are no fixes to show`() = runTest {
         val vm = startApp()
         assertNull(vm.fixes.value)
+    }
+
+    // --- Day log (M10) -------------------------------------------------------------------------
+
+    @Test
+    fun `the day log runs in a real room and its seconds reach the Log tab`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.StartLog)
+        advanceSeconds(3)
+        val view = assertNotNull(vm.log.value)
+        assertTrue(view.log.running)
+        assertEquals(3, view.log.seconds.size)
+        assertEquals(SoundLabel.FAN, view.log.seconds.first().label)
+        assertNotNull(view.summary)
+        assertEquals(3, logs.latest("r1")?.seconds?.size)
+        vm.onEvent(UiEvent.StopLog)
+        runCurrent()
+        assertFalse(assertNotNull(vm.log.value).log.running)
+    }
+
+    @Test
+    fun `the sample room can't be logged into`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.StartLog)
+        advanceSeconds(2)
+        assertFalse(vm.log.value?.log?.running == true)
+        assertTrue(logs.logs.isEmpty())
+    }
+
+    @Test
+    fun `measuring while the log holds the microphone says so`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.StartLog)
+        advanceSeconds(1)
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        assertEquals(MeasurePhase.Failed(CaptureProblem.IN_USE_BY_DAY_LOG), vm.phase())
+        vm.onEvent(UiEvent.StopLog) // the fake microphone never runs dry: an unstopped log would keep the test running forever
+        runCurrent()
+    }
+
+    @Test
+    fun `opening another room stops the log`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.StartLog)
+        advanceSeconds(2)
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        advanceSeconds(2)
+        assertFalse(vm.log.value?.log?.running == true)
+        assertEquals(2, logs.latest("r1")?.seconds?.size)
+    }
+
+    @Test
+    fun `deleting a room deletes its day logs`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.StartLog)
+        advanceSeconds(1)
+        vm.onEvent(UiEvent.StopLog)
+        vm.onEvent(UiEvent.DeleteRoom("r1"))
+        runCurrent()
+        assertNull(logs.latest("r1"))
+    }
+
+    @Test
+    fun `opening a room shows its latest log`() = runTest {
+        logs.open("r1", 7L).apply { append(LogSecond(7L, flatBands(-50.0), null)) }.close()
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        runCurrent()
+        val view = assertNotNull(vm.log.value)
+        assertEquals(7L, view.log.startMillis)
+        assertEquals(SeatId(4, 3), view.logSpot) // no seat picked: the middle of the back row
+    }
+
+    @Test
+    fun `clearing logs deletes the open room's logs but keeps its measurements`() = runTest {
+        logs.open("r1", 7L).apply { append(LogSecond(7L, flatBands(-50.0), null)) }.close()
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.ClearLogs)
+        runCurrent()
+        assertNull(logs.latest("r1"))
+        assertEquals(0, assertNotNull(vm.log.value).log.seconds.size)
+        assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(0, 0)))
     }
 }

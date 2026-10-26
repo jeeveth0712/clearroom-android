@@ -9,6 +9,7 @@ import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
+import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.RoomRepository
@@ -16,6 +17,9 @@ import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.daylog.DayLogController
+import com.clearroom.app.daylog.LogStore
+import com.clearroom.app.daylog.SoundLabeller
 import com.clearroom.app.dsp.Reverb
 import com.clearroom.app.measure.ClapTake
 import com.clearroom.app.measure.ClapVerdict
@@ -23,6 +27,7 @@ import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasureOutcome
 import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.measure.bandLevelsOf
+import com.clearroom.app.ui.DayLogView
 import com.clearroom.app.ui.Evaluation
 import com.clearroom.app.ui.FixesView
 import com.clearroom.app.ui.MeasurePhase
@@ -38,6 +43,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
@@ -45,6 +51,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 
@@ -56,7 +63,11 @@ import java.util.UUID
 class AppViewModel(
     audio: AudioInput,
     private val rooms: RoomRepository,
+    private val logs: LogStore,
+    newLabeller: () -> SoundLabeller?,
     dsp: CoroutineDispatcher = Dispatchers.Default,
+    private val io: CoroutineDispatcher = Dispatchers.IO,
+    clock: () -> Long = System::currentTimeMillis,
     private val newRoomId: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
@@ -86,6 +97,19 @@ class AppViewModel(
         .distinctUntilChanged()
         .conflate()
         .map { (session, settings) -> session?.let { FixesView.of(it, settings) } }
+        .flowOn(dsp)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    /** The day log (FR-9). It runs in the ViewModel's scope, so it stops when the app is closed. */
+    private val dayLog = DayLogController(viewModelScope, audio, logs, newLabeller, dsp, io, clock)
+
+    /** The Log tab (FR-9, FR-10, V5, V11): the current or latest log with its summary, worked out off the main thread. */
+    val log: StateFlow<DayLogView?> = combine(dayLog.state, state.map { it.session }, state.map { it.measure.selectedSeat }) { log, session, seat ->
+        Triple(log, session, seat)
+    }
+        .distinctUntilChanged()
+        .conflate()
+        .map { (log, session, seat) -> DayLogView.of(log, session, seat) }
         .flowOn(dsp)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
@@ -119,6 +143,9 @@ class AppViewModel(
             is UiEvent.DeleteRoom -> viewModelScope.launch { deleteRoom(event.roomId) }
             is UiEvent.FixesChanged -> _state.update { it.copy(fixes = event.settings) }
             UiEvent.ResetFixes -> _state.update { it.copy(fixes = FixSettings()) }
+            UiEvent.StartLog -> startLog()
+            UiEvent.StopLog -> dayLog.stop()
+            UiEvent.ClearLogs -> _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID }?.let(dayLog::clear)
         }
     }
 
@@ -137,6 +164,7 @@ class AppViewModel(
 
     private fun startMeasurement(kind: MeasureKind) {
         if (measurement?.isActive == true) return
+        if (dayLog.isRunning) return setPhase(MeasurePhase.Failed(CaptureProblem.IN_USE_BY_DAY_LOG))
         val current = _state.value
         val roomId = current.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
         val seat = current.measure.selectedSeat
@@ -272,7 +300,16 @@ class AppViewModel(
         }
     }
 
+    /** One thing records at a time: no log during a measurement, and never into the sample room. */
+    private fun startLog() {
+        if (measurement?.isActive == true) return
+        val roomId = _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
+        dayLog.start(roomId)
+    }
+
     private fun newRoom() {
+        dayLog.stop()
+        dayLog.show(null)
         _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null), fixes = FixSettings()) }
     }
 
@@ -280,6 +317,7 @@ class AppViewModel(
 
     private suspend fun deleteRoom(roomId: String) {
         rooms.delete(roomId)
+        withContext(io) { logs.deleteAll(roomId) } // its day logs go with it
         val saved = rooms.list()
         val wasOpen = _state.value.session?.room?.id == roomId
         if (wasOpen) newRoom()
@@ -288,6 +326,10 @@ class AppViewModel(
 
     /** Makes [session] the working room, loads it into the form, and keeps the seat choice valid. */
     private fun showSession(session: Session, notice: RoomNotice?) {
+        if (_state.value.session?.room?.id != session.room.id) {
+            dayLog.stop() // a log belongs to the room it started in
+            dayLog.show(session.room.id.takeUnless { it == SampleData.ROOM_ID })
+        }
         _state.update {
             val sameRoom = it.session?.room?.id == session.room.id
             it.copy(
@@ -317,7 +359,7 @@ class AppViewModel(
 
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
-            initializer { AppViewModel(container.audioInput, container.roomRepository) }
+            initializer { AppViewModel(container.audioInput, container.roomRepository, container.logStore, container::newSoundLabeller) }
         }
     }
 }

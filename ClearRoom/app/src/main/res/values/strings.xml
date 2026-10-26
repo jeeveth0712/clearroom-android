@@ -313,6 +313,55 @@
     <string name="fixes_voice_unreachable">The echo sets a ceiling at the back that no voice or microphone can pass. Curtains or other soft surfaces are needed.</string>
     <string name="fixes_voice_uncalibrated">This assumes a typical 60 dBA voice (uncalibrated); record the voice on the Measure tab for your own.</string>
 
+    <!-- Log tab: the day log (FR-9, FR-10, V5, V11) -->
+    <string name="log_no_room">Open or set up a room on the Room tab first: the day log is saved with it.</string>
+    <string name="log_sample_room">The sample room is for exploring. Save it as your own room on the Room tab, then log the noise here.</string>
+    <string name="log_spot">The phone logs at %1$s. Pick another seat on the Measure tab.</string>
+    <string name="log_how">Leave the phone at that seat, on its charger, for up to 8 hours. The screen stays on while it logs.</string>
+    <string name="log_start">Start the day log</string>
+    <string name="log_stop">Stop the log</string>
+    <string name="log_banner">Recording levels, not audio</string>
+    <string name="log_banner_detail">Each second keeps only seven sound levels and what kind of sound it was. Nothing that was said can be played back or read.</string>
+    <string name="log_running">Logging for %1$s</string>
+    <string name="log_no_labels">Sound types weren’t available on this phone, so only levels were logged.</string>
+    <string name="log_save_failed">Part of the log couldn’t be saved. Check the phone has free storage.</string>
+    <string name="log_empty">No day log for this room yet.</string>
+    <string name="log_clear">Clear this room’s day logs</string>
+    <string name="log_clear_title">Clear the day logs?</string>
+    <string name="log_clear_body">Every day log saved for this room is deleted. Its measurements stay. This can’t be undone.</string>
+    <string name="log_clear_confirm">Clear</string>
+    <string name="log_clear_keep">Keep</string>
+    <string name="log_summary_title">This log</string>
+    <!-- %1$s is a clock time, %2$s a duration like 1:05:30 -->
+    <string name="log_summary_started">Started at %1$s, length %2$s</string>
+    <string name="log_summary_levels">Noise about %1$s dBA on average, with a steady background of about %2$s dBA (the phone isn’t calibrated, so these are rough).</string>
+    <!-- %1$s sound type, %2$s clock time, %3$s level -->
+    <string name="log_summary_loudest">Loudest: %1$s at %2$s, about %3$s dBA.</string>
+    <string name="log_timeline_title">Noise and clarity through the day</string>
+    <string name="log_timeline_noise">Noise (≈ dBA)</string>
+    <string name="log_timeline_clarity">Back-row clarity</string>
+    <string name="log_timeline_background">background</string>
+    <string name="log_timeline_not_measured">Measure the room’s echo and noise on the Measure tab to see clarity through the day.</string>
+    <string name="log_timeline_caption_low">Periods when the back row is below easy listening: %1$d/%2$d. The back row hears best from %3$s.</string>
+    <string name="log_timeline_caption_ok">The back row stays easy to follow in every period.</string>
+    <string name="log_timeline_caption_noise">The grey line is the noise, the dashed line its steady background, and the coloured marks what was heard.</string>
+    <string name="log_landscape_title">Noise by time and pitch</string>
+    <string name="log_landscape_caption">Each bar is one pitch in one period: taller and lighter is louder. Fans hum at the back (low pitches), horns ring at the front (high). Drag sideways to turn, pinch to zoom.</string>
+    <string name="log_landscape_description">Noise by time and pitch, from %1$s to %2$s.</string>
+    <string name="log_events_title">What was heard</string>
+    <!-- %1$s a clock time or log_event_span, %2$s sound type, %3$s level -->
+    <string name="log_event">%1$s · %2$s · about %3$s dBA</string>
+    <string name="log_event_span">%1$s–%2$s</string>
+    <string name="log_events_none">No sounds were labelled in this log.</string>
+    <string name="log_events_latest">Latest first; showing up to %1$d.</string>
+    <string name="sound_fan">fan or AC</string>
+    <string name="sound_traffic">traffic</string>
+    <string name="sound_horn">horn</string>
+    <string name="sound_talking">talking</string>
+    <string name="sound_music">music</string>
+    <string name="sound_quiet">quiet</string>
+    <string name="sound_other">other sounds</string>
+
     <!-- Chart axes and legends -->
     <string name="chart_pitch_hz">Pitch (Hz)</string>
     <string name="chart_echo_time_s">Echo time (s)</string>
@@ -335,5 +384,6 @@
     <string name="levels_overall">Overall: %1$.0f dB (A-weighted)</string>
     <string name="problem_mic_unavailable">Couldn\'t open the microphone. Close other apps that use it, then try again.</string>
     <string name="problem_permission_revoked">Microphone access was turned off. Allow it again to measure.</string>
+    <string name="problem_day_log_running">The day log is using the microphone. Stop it on the Log tab first.</string>
     <string name="problem_read_failed">The recording stopped unexpectedly. Please try again.</string>
 </resources>

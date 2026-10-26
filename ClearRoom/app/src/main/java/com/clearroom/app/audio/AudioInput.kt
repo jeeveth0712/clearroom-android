@@ -1,5 +1,6 @@
 package com.clearroom.app.audio
 
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
@@ -44,7 +45,8 @@ data class CaptureInfo(
 
 class Capture(val clip: AudioClip, val info: CaptureInfo)
 
-enum class CaptureProblem { MIC_UNAVAILABLE, PERMISSION_REVOKED, READ_FAILED }
+/** [IN_USE_BY_DAY_LOG]: the day log holds the microphone; one thing records at a time. */
+enum class CaptureProblem { MIC_UNAVAILABLE, PERMISSION_REVOKED, READ_FAILED, IN_USE_BY_DAY_LOG }
 
 /** The only exception [AudioInput.record] throws, apart from cancellation. */
 class CaptureException(val problem: CaptureProblem, message: String) : Exception(message)
@@ -62,4 +64,13 @@ interface AudioInput : LiveLevelSource {
      * @throws CaptureException when the microphone can't be opened, read, or used without permission.
      */
     suspend fun record(seconds: Double): Capture
+
+    /**
+     * An endless stream of back-to-back [blockSeconds] clips from one open microphone, with no gap
+     * between blocks (the day log, FR-9). Collecting opens the microphone; cancelling the collector
+     * releases it. Each block is a fresh array the collector may keep.
+     *
+     * @throws CaptureException as for [record].
+     */
+    fun blocks(blockSeconds: Double): Flow<AudioClip>
 }

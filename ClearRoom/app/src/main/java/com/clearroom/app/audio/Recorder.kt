@@ -22,7 +22,10 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -49,7 +52,33 @@ class AndroidRecorder(
         return oneRecordingAtATime.withLock { withContext(io) { capture(seconds) } }
     }
 
-    private suspend fun capture(seconds: Double): Capture {
+    override fun blocks(blockSeconds: Double): Flow<AudioClip> {
+        require(blockSeconds.isFinite() && blockSeconds > 0.0) { "blockSeconds must be > 0, was $blockSeconds" }
+        return flow {
+            oneRecordingAtATime.withLock {
+                withOpenMicrophone { opened, _ ->
+                    startRecording(opened.record)
+                    val smoother = LevelSmoother()
+                    val blockSamples = (blockSeconds * opened.sampleRate).roundToInt()
+                    while (true) {
+                        val block = FloatArray(blockSamples) // fresh each time: the collector keeps it
+                        fill(opened, block, smoother)
+                        emit(AudioClip(block, opened.sampleRate))
+                    }
+                }
+            }
+        }.flowOn(io)
+    }
+
+    private suspend fun capture(seconds: Double): Capture = withOpenMicrophone { opened, info ->
+        startRecording(opened.record)
+        val samples = FloatArray((seconds * opened.sampleRate).roundToInt())
+        fill(opened, samples, LevelSmoother())
+        Capture(AudioClip(samples, opened.sampleRate), info)
+    }
+
+    /** Opens the best microphone setup, switches the voice effects off, and always releases both. */
+    private suspend fun <T> withOpenMicrophone(use: suspend (OpenedRecord, CaptureInfo) -> T): T {
         if (ContextCompat.checkSelfPermission(appContext, Manifest.permission.RECORD_AUDIO) !=
             PackageManager.PERMISSION_GRANTED
         ) {
@@ -64,9 +93,7 @@ class AndroidRecorder(
                 ?: throw CaptureException(CaptureProblem.MIC_UNAVAILABLE, "no sample format could be opened")
             val effects = disableEffects(opened.record.audioSessionId)
             try {
-                val samples = readSamples(opened, seconds)
-                val info = CaptureInfo(source, opened.sampleRate, opened.format, effects.map { it.first })
-                return Capture(AudioClip(samples, opened.sampleRate), info)
+                return use(opened, CaptureInfo(source, opened.sampleRate, opened.format, effects.map { it.first }))
             } finally {
                 stopQuietly(opened.record)
                 effects.forEach { it.second.release() }
@@ -78,18 +105,19 @@ class AndroidRecorder(
         }
     }
 
-    private suspend fun readSamples(opened: OpenedRecord, seconds: Double): FloatArray {
-        val record = opened.record
-        val total = (seconds * opened.sampleRate).roundToInt()
-        val out = FloatArray(total)
-        val chunk = opened.sampleRate / LEVEL_UPDATES_PER_S
-        val pcm16Buffer = if (opened.format == SampleFormat.PCM_16) ShortArray(chunk) else null
-        val smoother = LevelSmoother()
-
+    private fun startRecording(record: AudioRecord) {
         record.startRecording()
         if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
             throw CaptureException(CaptureProblem.MIC_UNAVAILABLE, "microphone is busy")
         }
+    }
+
+    /** Fills [out] completely from the running recorder, updating the live level as it goes. */
+    private suspend fun fill(opened: OpenedRecord, out: FloatArray, smoother: LevelSmoother) {
+        val record = opened.record
+        val total = out.size
+        val chunk = opened.sampleRate / LEVEL_UPDATES_PER_S
+        val pcm16Buffer = if (opened.format == SampleFormat.PCM_16) ShortArray(chunk) else null
         var filled = 0
         var emptyReads = 0
         while (filled < total) {
@@ -110,7 +138,6 @@ class AndroidRecorder(
                 }
             }
         }
-        return out
     }
 
     private fun readPcm16(record: AudioRecord, buffer: ShortArray, out: FloatArray, at: Int, wanted: Int): Int {

@@ -113,16 +113,18 @@ fun DrawScope.drawFrame(
     yTitle: String,
     style: ChartStyle,
     text: TextMeasurer,
+    minLeft: Float = 0f,
 ): PlotArea {
     val gap = 4.dp.toPx()
     val yLabels = yTicks.map { text.measure(it.label, style.label) }
     val xLabels = xTicks.map { text.measure(it.label, style.label) }
     val yTitleText = text.measure(yTitle, style.label)
-    val xTitleText = text.measure(xTitle, style.label)
-    val left = (yLabels.maxOfOrNull { it.size.width } ?: 0) + 2 * gap
+    val xTitleText = xTitle.takeIf { it.isNotBlank() }?.let { text.measure(it, style.label) }
+    // [minLeft] lines up stacked panels whose y labels differ in width.
+    val left = maxOf(minLeft, (yLabels.maxOfOrNull { it.size.width } ?: 0) + 2 * gap)
     val top = yTitleText.size.height + 2 * gap
     val right = size.width - (xLabels.lastOrNull()?.size?.width ?: 0) / 2f - gap
-    val bottom = size.height - (xLabels.maxOfOrNull { it.size.height } ?: 0) - xTitleText.size.height - 2 * gap
+    val bottom = size.height - (xLabels.maxOfOrNull { it.size.height } ?: 0) - (xTitleText?.size?.height ?: 0) - 2 * gap
     val area = PlotArea(left, top, right, bottom, x, y)
     val hairline = 1.dp.toPx()
 
@@ -138,7 +140,7 @@ fun DrawScope.drawFrame(
         drawText(label, topLeft = Offset(px - label.size.width / 2f, bottom + gap))
     }
     drawLine(style.axis, Offset(left, bottom), Offset(right, bottom), hairline)
-    drawText(xTitleText, topLeft = Offset((left + right - xTitleText.size.width) / 2f, size.height - xTitleText.size.height))
+    xTitleText?.let { drawText(it, topLeft = Offset((left + right - it.size.width) / 2f, size.height - it.size.height)) }
     return area
 }
 
