@@ -17,6 +17,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -26,12 +27,15 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
+import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.measure.ClapProblem
+import com.clearroom.app.measure.ClapTake
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.permission.MicAccess
 import com.clearroom.app.permission.rememberMicPermission
@@ -115,6 +119,8 @@ private fun Measurements(session: Session, measure: MeasureUiState, liveLevelDb:
         )
     }
 
+    EchoCard(session, measure, onEvent)
+
     InfoCard {
         Text(stringResource(R.string.measure_noise_title), style = MaterialTheme.typography.titleMedium)
         BodyText(R.string.measure_noise_hint)
@@ -155,6 +161,45 @@ private fun Measurements(session: Session, measure: MeasureUiState, liveLevelDb:
     }
 }
 
+/** FR-2/FR-3: three claps per seat, then the seat's echo time per band against the classroom target. */
+@Composable
+private fun EchoCard(session: Session, measure: MeasureUiState, onEvent: (UiEvent) -> Unit) {
+    val seat = measure.selectedSeat
+    val takes = seat?.let(session::measureAt)?.rtTakes.orEmpty()
+    val summary = Rt60Summary.of(takes)
+    InfoCard {
+        Text(stringResource(R.string.measure_clap_title), style = MaterialTheme.typography.titleMedium)
+        BodyText(R.string.measure_clap_hint)
+        Text(stringResource(R.string.measure_clap_delay_label), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            MeasureUiState.CLAP_DELAYS_S.forEach { seconds ->
+                FilterChip(
+                    selected = seconds == measure.clapDelayS,
+                    onClick = { onEvent(UiEvent.SetClapDelay(seconds)) },
+                    label = { Text(stringResource(R.string.measure_clap_delay_option, seconds)) },
+                )
+            }
+        }
+        Button(onClick = { onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP)) }, enabled = seat != null && !measure.phase.isBusy) {
+            Text(stringResource(R.string.measure_clap_start, takes.size, ClapTake.TAKES_PER_SEAT))
+        }
+        if (seat != null && summary != null) {
+            Text(stringResource(R.string.measure_rt_title), style = MaterialTheme.typography.titleSmall)
+            Rt60Table(summary)
+            Text(
+                stringResource(R.string.measure_rt_speech, summary.speechRt60S, Rt60Summary.CLASSROOM_TARGET_S),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (summary.bands.any { it.estimated }) {
+                Text(stringResource(R.string.measure_rt_estimated), style = MaterialTheme.typography.bodySmall)
+            }
+            TextButton(onClick = { onEvent(UiEvent.ClearClaps(seat)) }, enabled = !measure.phase.isBusy) {
+                Text(stringResource(R.string.measure_rt_clear))
+            }
+        }
+    }
+}
+
 @Composable
 private fun StatusCard(phase: MeasurePhase, liveLevelDb: () -> Double, onCancel: () -> Unit) {
     InfoCard {
@@ -166,12 +211,23 @@ private fun StatusCard(phase: MeasurePhase, liveLevelDb: () -> Double, onCancel:
             is MeasurePhase.Recording -> when (phase.kind) {
                 MeasureKind.NOISE -> stringResource(R.string.measure_recording_noise, phase.kind.durationS)
                 MeasureKind.VOICE -> stringResource(R.string.measure_recording_voice, phase.kind.durationS)
+                MeasureKind.CLAP -> stringResource(R.string.measure_recording_clap)
             }
             is MeasurePhase.Saved -> when (phase.kind) {
-                MeasureKind.NOISE -> stringResource(R.string.measure_saved_noise, phase.seat?.let { seatLabel(it) }.orEmpty())
                 MeasureKind.VOICE -> stringResource(R.string.measure_saved_voice)
+                // Claps report through ClapAccepted; NOISE and CLAP both name the seat.
+                MeasureKind.NOISE, MeasureKind.CLAP ->
+                    stringResource(R.string.measure_saved_noise, phase.seat?.let { seatLabel(it) }.orEmpty())
             }
-            is MeasurePhase.Rejected -> stringResource(phase.quality.messageRes())
+            is MeasurePhase.ClapAccepted -> stringResource(
+                R.string.measure_clap_saved,
+                phase.takes,
+                ClapTake.TAKES_PER_SEAT,
+                seatLabel(phase.seat),
+                phase.speechRt60S,
+            )
+            is MeasurePhase.ClapRejected -> stringResource(phase.problem.messageRes())
+            is MeasurePhase.Rejected -> stringResource(phase.quality.messageRes(phase.kind))
             is MeasurePhase.Failed -> stringResource(phase.problem.messageRes())
             MeasurePhase.SaveFailed -> stringResource(R.string.measure_save_failed)
         }
@@ -210,10 +266,18 @@ private fun FanState.labelRes(): Int = when (this) {
 }
 
 @StringRes
-private fun ClipQuality.messageRes(): Int = when (this) {
-    ClipQuality.CLIPPED -> R.string.quality_clipped
+private fun ClipQuality.messageRes(kind: MeasureKind): Int = when (this) {
+    ClipQuality.CLIPPED -> if (kind == MeasureKind.CLAP) R.string.quality_clipped_clap else R.string.quality_clipped
     // A measurement is never rejected as OK; listed so the `when` stays exhaustive.
     ClipQuality.SILENT, ClipQuality.OK -> R.string.quality_silent
+}
+
+@StringRes
+private fun ClapProblem.messageRes(): Int = when (this) {
+    ClapProblem.NO_CLAP -> R.string.clap_problem_no_clap
+    ClapProblem.CLAP_LOUDER -> R.string.clap_problem_louder
+    ClapProblem.TOO_NOISY -> R.string.clap_problem_noisy
+    ClapProblem.UNCLEAR -> R.string.clap_problem_unclear
 }
 
 @StringRes

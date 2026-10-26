@@ -122,6 +122,38 @@ class ModelsTest {
     }
 
     @Test
+    fun `claps add up at a seat and keep its noise reading`() {
+        val take1 = RtTake(List(7) { 1.0 })
+        val take2 = RtTake(List(7) { 1.1 })
+        val session = Session(aRoom()).withNoise(SeatId(1, 1), flatBands(-60.0), FanState.OFF)
+            .withClap(SeatId(1, 1), take1)
+            .withClap(SeatId(1, 1), take2)
+        val seat = assertNotNullSeat(session, SeatId(1, 1))
+        assertEquals(listOf(take1, take2), seat.rtTakes)
+        assertEquals(flatBands(-60.0), seat.noise)
+    }
+
+    @Test
+    fun `a clap at a seat with nothing measured yet creates that seat`() {
+        val session = Session(aRoom()).withClap(SeatId(0, 4), RtTake(List(7) { 0.9 }))
+        assertEquals(1, assertNotNullSeat(session, SeatId(0, 4)).rtTakes.size)
+        assertFailsWith<IllegalArgumentException> { Session(aRoom(rows = 2)).withClap(SeatId(3, 0), RtTake(List(7) { 0.9 })) }
+    }
+
+    @Test
+    fun `clearing claps empties only that seat's takes`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 0), aMeasuredSeat(1, 1)))
+        val cleared = session.withoutClaps(SeatId(0, 0))
+        assertEquals(emptyList(), assertNotNullSeat(cleared, SeatId(0, 0)).rtTakes)
+        assertEquals(aMeasuredSeat(0, 0).noise, assertNotNullSeat(cleared, SeatId(0, 0)).noise)
+        assertEquals(aMeasuredSeat(1, 1), cleared.measureAt(SeatId(1, 1)))
+        assertEquals(session, session.withoutClaps(SeatId(4, 4))) // nothing there: unchanged
+    }
+
+    private fun assertNotNullSeat(session: Session, seat: SeatId) =
+        session.measureAt(seat) ?: throw AssertionError("no measurement at $seat")
+
+    @Test
     fun `saved-room entries expose their id whether readable or damaged`() {
         val summary = RoomSummary("a", "A", 9.0, 7.0, 30, 0, savedAtMillis = 1)
         assertEquals("a", SavedRoom.Readable(summary).id)

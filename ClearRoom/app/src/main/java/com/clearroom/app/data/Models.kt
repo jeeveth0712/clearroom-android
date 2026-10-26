@@ -106,14 +106,25 @@ data class Session(
     fun measureAt(seat: SeatId): SeatMeasure? = seats.firstOrNull { it.seat == seat }
 
     /** FR-4: records (or replaces) the noise snapshot at [seat], keeping that seat's echo takes. */
-    fun withNoise(seat: SeatId, noise: BandLevels, fans: FanState): Session {
-        require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
-        val updated = (measureAt(seat) ?: SeatMeasure(seat.row, seat.col)).copy(noise = noise, fans = fans)
-        return copy(seats = (seats.filterNot { it.seat == seat } + updated).sortedWith(compareBy({ it.row }, { it.col })))
-    }
+    fun withNoise(seat: SeatId, noise: BandLevels, fans: FanState): Session =
+        updateSeat(seat) { it.copy(noise = noise, fans = fans) }
 
     /** FR-5: records (or replaces) the speaker's voice reference at 1 m. */
     fun withVoice(voice: BandLevels): Session = copy(voice = voice)
+
+    /** FR-2: adds one accepted clap take at [seat], keeping the earlier takes and the noise. */
+    fun withClap(seat: SeatId, take: RtTake): Session =
+        updateSeat(seat) { it.copy(rtTakes = it.rtTakes + take) }
+
+    /** Clears the clap takes at [seat] so they can be redone; its noise reading stays. */
+    fun withoutClaps(seat: SeatId): Session =
+        if (measureAt(seat) == null) this else updateSeat(seat) { it.copy(rtTakes = emptyList()) }
+
+    private fun updateSeat(seat: SeatId, change: (SeatMeasure) -> SeatMeasure): Session {
+        require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
+        val updated = change(measureAt(seat) ?: SeatMeasure(seat.row, seat.col))
+        return copy(seats = (seats.filterNot { it.seat == seat } + updated).sortedWith(compareBy({ it.row }, { it.col })))
+    }
 }
 
 /** What the saved-rooms list shows, without loading every measurement. */

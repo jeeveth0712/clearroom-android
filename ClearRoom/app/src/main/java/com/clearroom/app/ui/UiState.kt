@@ -9,6 +9,7 @@ import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
 
 /** Everything the screens show, one immutable value. Only AppViewModel writes it. */
@@ -36,8 +37,14 @@ data class MeasureUiState(
     val selectedSeat: SeatId? = null,
     /** FR-4: fan / AC state recorded with the next noise snapshot. */
     val fans: FanState = FanState.OFF,
+    /** Countdown before a clap recording: the doc's 3 s, or 10 s to walk from the seat to the front. */
+    val clapDelayS: Int = CLAP_DELAYS_S.first(),
     val phase: MeasurePhase = MeasurePhase.Idle,
-)
+) {
+    companion object {
+        val CLAP_DELAYS_S = listOf(3, 10)
+    }
+}
 
 /** Steps of one measurement. Only legal states exist, so the screen is a single `when`. */
 sealed interface MeasurePhase {
@@ -49,6 +56,12 @@ sealed interface MeasurePhase {
     /** The recording was unusable (clipped or silent); nothing was saved. */
     data class Rejected(val kind: MeasureKind, val quality: ClipQuality) : MeasurePhase
     data class Failed(val problem: CaptureProblem) : MeasurePhase
+
+    /** A clap gave a usable echo time; [takes] is how many accepted claps the seat now has. */
+    data class ClapAccepted(val seat: SeatId, val takes: Int, val speechRt60S: Double) : MeasurePhase
+
+    /** A clap couldn't be used; [problem] says what to do differently (FR-2). */
+    data class ClapRejected(val problem: ClapProblem) : MeasurePhase
 
     /** Measured fine, but writing the room file failed. */
     data object SaveFailed : MeasurePhase
@@ -62,6 +75,8 @@ sealed interface UiEvent {
     data class SetFans(val fans: FanState) : UiEvent
     data class StartMeasurement(val kind: MeasureKind) : UiEvent
     data object CancelRecording : UiEvent
+    data class SetClapDelay(val seconds: Int) : UiEvent
+    data class ClearClaps(val seat: SeatId) : UiEvent
 
     data class RoomFormChanged(val form: RoomForm) : UiEvent
     data object SaveRoom : UiEvent

@@ -233,7 +233,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 - [x] **M4 — Filters and levels.** Biquad filters, 7-band octave bank, noise snapshot, voice reference. *(Done Oct 26: 153 laptop + 50 phone tests pass. Measure tab: pick the seat, set the fan state, measure 30 s of noise (FR-4; Part E decision 1) or 20 s of voice at 1 m (FR-5); each reading is saved into the room as 7 band levels plus an approximate A-weighted total. The sample room can't be measured into: save your own copy first. Phone tests now run in a separate test app so they never erase your rooms.)*
   *Skills:* acoustics-dsp.
   *Done when:* the noise and voice measurements each show 7 band numbers.
-- [ ] **M5 — Echo analysis.** RT60 per band from a clap, Schroeder curve, quality messages ("clap louder", "too noisy", "clipped"), 3 takes per seat.
+- [x] **M5 — Echo analysis.** RT60 per band from a clap, Schroeder curve, quality messages ("clap louder", "too noisy", "clipped"), 3 takes per seat. *(Done Oct 26: 201 laptop + 58 phone tests pass. 160 synthetic claps show no bias in any band; the 3-clap seat result meets NFR-3 in 250 Hz–4 kHz and 8 kHz. Clap countdown 3 s by default, 10 s optional. Waiting on your real-clap check.)*
   *Skills:* acoustics-dsp, clearroom-testing.
   *Done when:* unit tests on synthetic claps meet NFR-3 (±10 % or ±0.1 s), and a real clap in a normal room gives RT60 between 0.3 and 2 s.
 - [ ] **M6 — Clarity engine.** STI, Sabine fit, speech level vs distance, limiting cause, what-if, required voice level.

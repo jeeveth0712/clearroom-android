@@ -5,16 +5,23 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.clearroom.app.acoustics.Rt60Summary
+import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
+import com.clearroom.app.data.FanState
 import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.RoomRepository
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
-import com.clearroom.app.measure.LevelMeasurement
+import com.clearroom.app.dsp.Reverb
+import com.clearroom.app.measure.ClapTake
+import com.clearroom.app.measure.ClapVerdict
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasureOutcome
+import com.clearroom.app.measure.MeasurementRunner
+import com.clearroom.app.measure.bandLevelsOf
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.RoomNotice
@@ -33,8 +40,9 @@ import java.io.IOException
 import java.util.UUID
 
 /**
- * The app's single ViewModel (doc decision). It holds state and sequences work; recording and
- * analysis are [LevelMeasurement]'s job and storage is [RoomRepository]'s.
+ * The app's single ViewModel (doc decision). It holds state and sequences work; recording is
+ * [MeasurementRunner]'s job, analysis belongs to the engine (OctaveBank, Reverb, ClapTake) and
+ * storage to [RoomRepository].
  */
 class AppViewModel(
     audio: AudioInput,
@@ -49,7 +57,7 @@ class AppViewModel(
     /** Separate from [state] so 20 level updates a second redraw only the level bar. */
     val liveLevelDb: StateFlow<Double> = audio.liveLevelDb
 
-    private val levels = LevelMeasurement(audio, dsp)
+    private val runner = MeasurementRunner(audio, dsp)
     private var measurement: Job? = null
 
     init {
@@ -68,6 +76,8 @@ class AppViewModel(
             is UiEvent.SetFans -> updateMeasure { it.copy(fans = event.fans) }
             is UiEvent.StartMeasurement -> startMeasurement(event.kind)
             UiEvent.CancelRecording -> cancelMeasurement()
+            is UiEvent.SetClapDelay -> setClapDelay(event.seconds)
+            is UiEvent.ClearClaps -> clearClaps(event.seat)
             is UiEvent.RoomFormChanged -> updateRoom { it.copy(form = event.form, problems = emptyMap(), notice = null) }
             UiEvent.SaveRoom -> viewModelScope.launch { saveRoom() }
             UiEvent.NewRoom -> newRoom()
@@ -77,7 +87,7 @@ class AppViewModel(
         }
     }
 
-    // --- Measuring (FR-4, FR-5) --------------------------------------------------------------
+    // --- Measuring (FR-2 to FR-5) ------------------------------------------------------------
 
     private fun selectSeat(seat: SeatId) {
         val session = _state.value.session ?: return
@@ -86,50 +96,91 @@ class AppViewModel(
         }
     }
 
+    private fun setClapDelay(seconds: Int) {
+        if (seconds in MeasureUiState.CLAP_DELAYS_S) updateMeasure { it.copy(clapDelayS = seconds) }
+    }
+
     private fun startMeasurement(kind: MeasureKind) {
         if (measurement?.isActive == true) return
         val current = _state.value
-        val session = current.session?.takeUnless { it.room.id == SampleData.ROOM_ID } ?: return
+        val roomId = current.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
         val seat = current.measure.selectedSeat
-        if (kind == MeasureKind.NOISE && seat == null) return
-        val fans = current.measure.fans
+        if (kind != MeasureKind.VOICE && seat == null) return
 
         measurement = viewModelScope.launch {
-            val outcome = levels.run(
-                kind,
-                onCountdown = { setPhase(MeasurePhase.Countdown(kind, it)) },
-                onRecording = { setPhase(MeasurePhase.Recording(kind)) },
-            )
             setPhase(
-                when (outcome) {
-                    is MeasureOutcome.Rejected -> MeasurePhase.Rejected(kind, outcome.quality)
-                    is MeasureOutcome.Failed -> MeasurePhase.Failed(outcome.problem)
-                    is MeasureOutcome.Measured -> {
-                        val saved = saveMeasurement(session.room.id) { latest ->
-                            when (kind) {
-                                MeasureKind.NOISE -> latest.withNoise(requireNotNull(seat), outcome.levels, fans)
-                                MeasureKind.VOICE -> latest.withVoice(outcome.levels)
-                            }
-                        }
-                        if (saved) MeasurePhase.Saved(kind, seat.takeIf { kind == MeasureKind.NOISE }) else MeasurePhase.SaveFailed
-                    }
+                when (kind) {
+                    MeasureKind.NOISE -> measureNoise(roomId, requireNotNull(seat), current.measure.fans)
+                    MeasureKind.VOICE -> measureVoice(roomId)
+                    MeasureKind.CLAP -> measureClap(roomId, requireNotNull(seat), current.measure.clapDelayS)
                 },
             )
         }
     }
 
+    private suspend fun measureNoise(roomId: String, seat: SeatId, fans: FanState): MeasurePhase =
+        record(MeasureKind.NOISE, analyse = ::bandLevelsOf).toPhase(MeasureKind.NOISE) { levels ->
+            if (saveMeasurement(roomId) { it.withNoise(seat, levels, fans) } == null) MeasurePhase.SaveFailed
+            else MeasurePhase.Saved(MeasureKind.NOISE, seat)
+        }
+
+    private suspend fun measureVoice(roomId: String): MeasurePhase =
+        record(MeasureKind.VOICE, analyse = ::bandLevelsOf).toPhase(MeasureKind.VOICE) { levels ->
+            if (saveMeasurement(roomId) { it.withVoice(levels) } == null) MeasurePhase.SaveFailed
+            else MeasurePhase.Saved(MeasureKind.VOICE, seat = null)
+        }
+
+    private suspend fun measureClap(roomId: String, seat: SeatId, delayS: Int): MeasurePhase =
+        record(MeasureKind.CLAP, delayS) { Reverb.analyse(it.samples, it.sampleRate) }.toPhase(MeasureKind.CLAP) { result ->
+            when (val verdict = ClapTake.judge(result)) {
+                is ClapVerdict.Rejected -> MeasurePhase.ClapRejected(verdict.problem)
+                is ClapVerdict.Accepted -> {
+                    val saved = saveMeasurement(roomId) { it.withClap(seat, verdict.take) }
+                    val speechRt60S = requireNotNull(Rt60Summary.of(listOf(verdict.take))).speechRt60S
+                    if (saved == null) MeasurePhase.SaveFailed
+                    else MeasurePhase.ClapAccepted(seat, saved.measureAt(seat)?.rtTakes?.size ?: 1, speechRt60S)
+                }
+            }
+        }
+
+    private fun clearClaps(seat: SeatId) {
+        val roomId = _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
+        if (_state.value.measure.phase.isBusy) return
+        viewModelScope.launch {
+            val saved = saveMeasurement(roomId) { it.withoutClaps(seat) }
+            setPhase(if (saved == null) MeasurePhase.SaveFailed else MeasurePhase.Idle)
+        }
+    }
+
+    private suspend fun <T> record(kind: MeasureKind, countdownS: Int = MeasurementRunner.COUNTDOWN_S, analyse: (AudioClip) -> T) =
+        runner.run(
+            kind,
+            countdownS,
+            onCountdown = { setPhase(MeasurePhase.Countdown(kind, it)) },
+            onRecording = { setPhase(MeasurePhase.Recording(kind)) },
+            analyse = analyse,
+        )
+
+    /** Unusable recordings and microphone problems read the same for every kind of measurement. */
+    private inline fun <T> MeasureOutcome<T>.toPhase(kind: MeasureKind, onMeasured: (T) -> MeasurePhase): MeasurePhase =
+        when (this) {
+            is MeasureOutcome.Measured -> onMeasured(result)
+            is MeasureOutcome.Rejected -> MeasurePhase.Rejected(kind, quality)
+            is MeasureOutcome.Failed -> MeasurePhase.Failed(problem)
+        }
+
     /**
-     * Applies [change] to the latest version of room [roomId] and stores it. The user may have
-     * edited or switched rooms during a 30-s recording, so the result always goes to the room it
-     * was measured in.
+     * Applies [change] to the latest version of room [roomId], stores it and returns it, or null if
+     * the room is gone or the save failed. The user may switch rooms during a 30-s recording, so a
+     * result always goes to the room it was measured in.
      */
-    private suspend fun saveMeasurement(roomId: String, change: (Session) -> Session): Boolean {
-        val latest = _state.value.session?.takeIf { it.room.id == roomId } ?: rooms.load(roomId) ?: return false
+    private suspend fun saveMeasurement(roomId: String, change: (Session) -> Session): Session? {
+        val latest = _state.value.session?.takeIf { it.room.id == roomId } ?: rooms.load(roomId) ?: return null
         val updated = change(latest)
         try {
             rooms.save(updated)
         } catch (e: IOException) {
-            return false
+            return null
         }
         val saved = rooms.list()
         _state.update {
@@ -138,7 +189,7 @@ class AppViewModel(
                 room = it.room.copy(saved = saved),
             )
         }
-        return true
+        return updated
     }
 
     private fun cancelMeasurement() {

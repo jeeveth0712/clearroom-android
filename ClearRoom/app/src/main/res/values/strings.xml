@@ -108,6 +108,24 @@
     <string name="seat_label">Row %1$d, seat %2$d</string>
     <string name="seat_measured">noise measured</string>
 
+    <!-- Measure tab: echo / clap test (FR-2, FR-3) -->
+    <string name="measure_clap_title">Echo (clap test)</string>
+    <string name="measure_clap_hint">Put the phone on the selected seat. Someone at the speaker\'s spot at the front claps once, sharply, just after the recording starts. A balloon pop works even better. Do it 3 times per seat.</string>
+    <string name="measure_clap_delay_label">Time to get to the front</string>
+    <string name="measure_clap_delay_option">%1$d s</string>
+    <string name="measure_clap_start">Clap test (%1$d/%2$d)</string>
+    <string name="measure_rt_title">Echo time at this seat (seconds)</string>
+    <string name="measure_rt_speech">About %1$.1f s at speech pitches. Classrooms should be %2$.1f s or less.</string>
+    <string name="measure_rt_estimated">Numbers in brackets are borrowed from the nearest band: the claps were too weak there.</string>
+    <string name="measure_rt_clear">Clear claps for this seat</string>
+    <string name="measure_recording_clap">Clap now! Once, sharply.</string>
+    <string name="measure_clap_saved">Clap saved (%1$d/%2$d) for %3$s: echo about %4$.1f s.</string>
+    <string name="quality_clipped_clap">Too loud: the clap overloaded the microphone. Clap a little softer or further from the phone.</string>
+    <string name="clap_problem_no_clap">No clap heard. Clap once, sharply, right after the recording starts.</string>
+    <string name="clap_problem_louder">The clap was too quiet to measure the echo. Clap louder, or try a balloon pop.</string>
+    <string name="clap_problem_noisy">Too noisy to hear the echo. Switch off fans or wait for quiet, then clap again.</string>
+    <string name="clap_problem_unclear">The echo measurement was unclear. Please clap again.</string>
+
     <!-- Measure tab: background noise (FR-4) -->
     <string name="measure_noise_title">Background noise</string>
     <string name="measure_noise_hint">Leave fans and AC as they usually are and say how they\'re set. Everyone keeps quiet while the phone listens.</string>

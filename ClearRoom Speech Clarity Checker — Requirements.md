@@ -308,6 +308,7 @@ Kept up to date during the build. The sections above are the original plan; this
 | --- | --- | --- | --- |
 | Noise snapshot length | FR-4: 30 s · parameters table: 10 s | **30 s** | Steadier reading when noise comes and goes (owner's choice) |
 | Surfaces | Data model: one `surfacePreset` · FR-1: tag surfaces from a pick list | Floor, walls and ceiling each tagged from the FR-1 pick list; seated students as a count | Follows FR-1, which is the functional requirement |
+| Clap rejection limit | FR-2: 25 dB of decay above noise · parameters table: 30 dB | **30 dB** | A T20 fit down to −25 dB needs margin above the noise floor |
 
 ### Changes made during the build
 
@@ -318,8 +319,28 @@ Kept up to date during the build. The sections above are the original plan; this
 | Toolchain | Android Studio Rabbit 1 (2026.2.1), AGP 9.4.1, Kotlin raised from the template's 2.2.10 to 2.4.21, Compose BOM 2026.09.00 | Kotlin 2.2.10 is only tested up to AGP 8.10; 2.4.21 is tested with this Gradle and much closer to this AGP |
 | Icons | Tab icons drawn as small vector files | Material 3 1.4 no longer bundles the Material icon library |
 | Testing | On-phone tests run in a separate test app (`com.clearroom.app.uitest`) | The test runner uninstalls the app it tests; this way it never erases the user's saved rooms |
+| Clap countdown | 3 s | 3 s by default, **10 s optional** | With the phone on a back seat, one person can't reach the front in 3 s |
+| Clap filtering | Band-pass each octave | Band-pass the **time-reversed** clip | Moves the filters' own ringing before the clap instead of onto the decay (ISO 3382-1 allows this) |
+| Clap onset | Noise from the 0.3 s before the clap | The clap starts where the energy first comes within 20 dB of its loudest moment; the noise window ends 50 ms before that | The loudest moment can be a later reflection; a test caught the noise window swallowing the decay |
+| Which claps count | Not specified | A clap counts when 500 Hz, 1 kHz and 2 kHz all give an echo time; outer bands that fail are left empty and later borrowed from the nearest band, marked "estimated" | Speech bands matter most; claps are weak at 125 Hz (risk table) |
+| Decay straightness | Not specified (ISO 3382 calls ξ > 10 ‰ curved) | A band is refused only above ξ = 40 ‰ | Short decays in the narrow 125–250 Hz bands reach 20–40 ‰ while still giving the right slope; every band at or below 40 ‰ met NFR-3 in the synthetic tests |
+| How NFR-3 is checked | ±10 % or ±0.1 s on synthetic decays | Checked on what the app reports, the **mean of the 3 claps** (FR-2, FR-3), for 250 Hz–4 kHz and 8 kHz; single claps must also meet it at 500 Hz–2 kHz; 125 Hz (outside FR-3) within ±25 % or ±0.15 s | One clap's echo time scatters randomly around the truth (no bias), most in narrow bands; see the table below |
 
 ### Measured on the test phone (Samsung Galaxy S24 Ultra, Android 16)
 
 - The phone does **not** offer Android's raw `UNPROCESSED` microphone source, so ClearRoom uses the `VOICE_RECOGNITION` source at 48 kHz, 32-bit float, as NFR-7 allows. Android attaches a noise suppressor and an echo canceller to that source; ClearRoom switches both off. No automatic gain control is attached.
 - During a phone call Android gives other apps silence instead of microphone sound. ClearRoom detects this and says "No sound came through" instead of saving a wrong reading.
+
+### Echo-time accuracy on synthetic decays (40 random claps per case, Oct 26)
+
+Each synthetic clap is decaying white noise with a known echo time, like a real room's response. The table shows how much one clap's measured echo time scatters around the true value (standard deviation). The average error (bias) was under 3.5 % in every band and about 0 % from 250 Hz up, so the method itself is accurate. The scatter is why three claps are averaged per seat: averaging divides it by √3.
+
+| Band | True echo 0.3 s | 0.8 s | 2.0 s |
+| --- | --- | --- | --- |
+| 125 Hz | 12.4 % | 10.0 % | 5.8 % |
+| 250 Hz | 8.7 % | 6.3 % | 3.7 % |
+| 500 Hz | 8.3 % | 5.2 % | 3.0 % |
+| 1 kHz | 5.0 % | 3.5 % | 1.9 % |
+| 2 kHz | 3.7 % | 2.3 % | 1.7 % |
+| 4 kHz | 2.7 % | 1.3 % | 1.1 % |
+| 8 kHz | 1.7 % | 1.3 % | 1.0 % |

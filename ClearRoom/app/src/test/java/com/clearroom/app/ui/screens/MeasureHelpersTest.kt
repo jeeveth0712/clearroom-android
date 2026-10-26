@@ -1,6 +1,7 @@
 package com.clearroom.app.ui.screens
 
 import androidx.compose.ui.unit.dp
+import com.clearroom.app.acoustics.BandRt60
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -23,6 +24,12 @@ class MeasureHelpersTest {
     fun `seat cells fill the width between gaps, capped at 44 dp`() {
         assertEquals(44.dp, seatCellSize(availableWidth = 400.dp, cols = 6, gap = 4.dp))
         assertEquals(10.dp, seatCellSize(availableWidth = 136.dp, cols = 10, gap = 4.dp)) // (136 - 9*4) / 10
+    }
+
+    @Test
+    fun `echo times show to a tenth of a second, borrowed ones in brackets`() {
+        assertEquals("1.2", rt60Cell(BandRt60(1.234, 0.1, 3, estimated = false)).replace(',', '.'))
+        assertEquals("(0.9)", rt60Cell(BandRt60(0.88, 0.0, 0, estimated = true)).replace(',', '.'))
     }
 
     @Test

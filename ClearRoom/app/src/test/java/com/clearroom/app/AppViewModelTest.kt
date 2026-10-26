@@ -10,7 +10,8 @@ import com.clearroom.app.data.SavedRoom
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.SeatMeasure
 import com.clearroom.app.data.Session
-import com.clearroom.app.measure.LevelMeasurement
+import com.clearroom.app.measure.MeasurementRunner
+import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.testing.FakeAudioInput
 import com.clearroom.app.testing.InMemoryRoomRepository
@@ -110,7 +111,7 @@ class AppViewModelTest {
         vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
         runCurrent()
         assertEquals(MeasurePhase.Countdown(MeasureKind.NOISE, 3), vm.phase())
-        advanceSeconds(LevelMeasurement.COUNTDOWN_S)
+        advanceSeconds(MeasurementRunner.COUNTDOWN_S)
         assertEquals(MeasurePhase.Recording(MeasureKind.NOISE), vm.phase())
         advanceUntilIdle()
 
@@ -185,7 +186,7 @@ class AppViewModelTest {
     fun `cancel during recording stops it, returns to idle and saves nothing`() = runTest {
         val vm = startWithRoom()
         vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
-        advanceSeconds(LevelMeasurement.COUNTDOWN_S + 1)
+        advanceSeconds(MeasurementRunner.COUNTDOWN_S + 1)
         assertIs<MeasurePhase.Recording>(vm.phase())
         vm.onEvent(UiEvent.CancelRecording)
         advanceUntilIdle()
@@ -242,12 +243,106 @@ class AppViewModelTest {
         val vm = startWithRoom() // "r1" is saved last, so it opens
         vm.onEvent(UiEvent.SelectSeat(SeatId(1, 1)))
         vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
-        advanceSeconds(LevelMeasurement.COUNTDOWN_S + 1)
+        advanceSeconds(MeasurementRunner.COUNTDOWN_S + 1)
         vm.onEvent(UiEvent.OpenRoom("other"))
         advanceUntilIdle()
         assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(1, 1)))
         assertEquals(emptyList(), assertNotNull(rooms.load("other")).seats)
         assertEquals("other", vm.state.value.session?.room?.id)
+    }
+
+    // --- Clap test (M5) ------------------------------------------------------------------------
+
+    private fun clapsWithEcho(t60S: Double) {
+        audio.samples = { rate, seconds -> Signals.syntheticClap(t60S, sampleRate = rate, lengthS = seconds) }
+    }
+
+    @Test
+    fun `a clap test needs a seat`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+        advanceUntilIdle()
+        assertEquals(emptyList(), audio.requestedSeconds)
+    }
+
+    @Test
+    fun `a good clap counts down, records 5 s, and saves a take with its echo time`() = runTest {
+        clapsWithEcho(0.8)
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(4, 2)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+        runCurrent()
+        assertEquals(MeasurePhase.Countdown(MeasureKind.CLAP, 3), vm.phase())
+        advanceSeconds(MeasurementRunner.COUNTDOWN_S)
+        assertEquals(MeasurePhase.Recording(MeasureKind.CLAP), vm.phase())
+        advanceUntilIdle()
+
+        val accepted = assertIs<MeasurePhase.ClapAccepted>(vm.phase())
+        assertEquals(SeatId(4, 2), accepted.seat)
+        assertEquals(1, accepted.takes)
+        assertEquals(0.8, accepted.speechRt60S, absoluteTolerance = 0.08)
+        assertEquals(listOf(5.0), audio.requestedSeconds)
+        assertEquals(1, assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(4, 2))).rtTakes.size)
+    }
+
+    @Test
+    fun `three claps give three takes at the seat`() = runTest {
+        clapsWithEcho(1.2)
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        repeat(3) {
+            vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+            advanceUntilIdle()
+        }
+        assertEquals(3, assertIs<MeasurePhase.ClapAccepted>(vm.phase()).takes)
+        assertEquals(3, vm.state.value.session?.measureAt(SeatId(0, 0))?.rtTakes?.size)
+    }
+
+    @Test
+    fun `the clap countdown can be 10 s to walk to the front, but only the offered lengths`() = runTest {
+        clapsWithEcho(0.8)
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SetClapDelay(7))
+        assertEquals(3, vm.state.value.measure.clapDelayS)
+        vm.onEvent(UiEvent.SetClapDelay(10))
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+        runCurrent()
+        assertEquals(MeasurePhase.Countdown(MeasureKind.CLAP, 10), vm.phase())
+        advanceSeconds(9)
+        assertEquals(MeasurePhase.Countdown(MeasureKind.CLAP, 1), vm.phase())
+    }
+
+    @Test
+    fun `a missing clap is explained and nothing is saved`() = runTest {
+        audio.samples = { rate, seconds -> Signals.sine(1_000.0, 0.05, seconds, rate) } // steady tone, no clap
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.ClapRejected(ClapProblem.NO_CLAP), vm.phase())
+        assertEquals(emptyList(), assertNotNull(rooms.load("r1")).seats)
+    }
+
+    @Test
+    fun `a clipped clap is rejected as too loud`() = runTest {
+        audio.samples = { rate, seconds -> Signals.clipped(run = 10, seconds = seconds, sampleRate = rate) }
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Rejected(MeasureKind.CLAP, ClipQuality.CLIPPED), vm.phase())
+    }
+
+    @Test
+    fun `clearing claps removes that seat's takes but keeps its noise`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(1, 1))
+        vm.onEvent(UiEvent.ClearClaps(SeatId(1, 1)))
+        runCurrent()
+        val seat = assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(1, 1)))
+        assertEquals(emptyList(), seat.rtTakes)
+        assertEquals(aMeasuredSeat(1, 1).noise, seat.noise)
+        assertEquals(MeasurePhase.Idle, vm.phase())
     }
 
     @Test

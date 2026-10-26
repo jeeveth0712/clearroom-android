@@ -1,5 +1,6 @@
 package com.clearroom.app.measure
 
+import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
 import com.clearroom.app.audio.CaptureException
 import com.clearroom.app.audio.CaptureProblem
@@ -11,38 +12,44 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
-/** What a level recording is for, and how long it lasts. */
+/** What a recording is for, and how long it lasts. */
 enum class MeasureKind(val durationS: Double) {
-    /** FR-4 says 30 s; the parameters table says 10 s. 30 s chosen (plan, Part E) for a steadier reading. */
+    /** FR-4 says 30 s; the parameters table says 10 s. 30 s chosen (owner's decision) for a steadier reading. */
     NOISE(30.0),
 
     /** FR-5 and "Exact parameters": the speaker reads for 20 s at normal voice, phone at 1 m. */
     VOICE(20.0),
+
+    /** "Exact parameters": a 5-s recording with the clap about 1 s in (FR-2). */
+    CLAP(5.0),
 }
 
-sealed interface MeasureOutcome {
-    data class Measured(val levels: BandLevels, val summary: RecordingSummary) : MeasureOutcome
+sealed interface MeasureOutcome<out T> {
+    data class Measured<T>(val result: T, val summary: RecordingSummary) : MeasureOutcome<T>
 
-    /** The clip itself was unusable (clipped or silent); nothing should be saved. */
-    data class Rejected(val quality: ClipQuality) : MeasureOutcome
+    /** The clip itself was unusable (clipped or silent); nothing should be analysed or saved. */
+    data class Rejected(val quality: ClipQuality) : MeasureOutcome<Nothing>
 
-    data class Failed(val problem: CaptureProblem) : MeasureOutcome
+    data class Failed(val problem: CaptureProblem) : MeasureOutcome<Nothing>
 }
 
 /**
- * One band-level measurement: countdown, recording, quality check, then the seven octave-band
- * levels. The samples exist only inside [run] and are dropped when it returns (NFR-6).
+ * Runs one measurement: countdown, recording, the clip-quality check, then [analyse] on the DSP
+ * dispatcher. The samples exist only inside [run] and are dropped when it returns (NFR-6).
  */
-class LevelMeasurement(
+class MeasurementRunner(
     private val audio: AudioInput,
     private val dsp: CoroutineDispatcher,
 ) {
-    suspend fun run(
+    suspend fun <T> run(
         kind: MeasureKind,
+        countdownS: Int = COUNTDOWN_S,
         onCountdown: (secondsLeft: Int) -> Unit,
         onRecording: () -> Unit,
-    ): MeasureOutcome {
-        for (secondsLeft in COUNTDOWN_S downTo 1) {
+        analyse: (AudioClip) -> T,
+    ): MeasureOutcome<T> {
+        require(countdownS >= 0) { "countdownS can't be negative: $countdownS" }
+        for (secondsLeft in countdownS downTo 1) {
             onCountdown(secondsLeft)
             delay(1_000)
         }
@@ -57,8 +64,7 @@ class LevelMeasurement(
             if (summary.quality != ClipQuality.OK) {
                 MeasureOutcome.Rejected(summary.quality)
             } else {
-                val levels = OctaveBank.bandLevelsDb(capture.clip.samples, capture.clip.sampleRate)
-                MeasureOutcome.Measured(BandLevels(levels.toList()), summary)
+                MeasureOutcome.Measured(analyse(capture.clip), summary)
             }
         }
     }
@@ -68,3 +74,7 @@ class LevelMeasurement(
         const val COUNTDOWN_S = 3
     }
 }
+
+/** The analysis for noise and voice readings: seven octave-band levels (FR-4, FR-5). */
+fun bandLevelsOf(clip: AudioClip): BandLevels =
+    BandLevels(OctaveBank.bandLevelsDb(clip.samples, clip.sampleRate).toList())

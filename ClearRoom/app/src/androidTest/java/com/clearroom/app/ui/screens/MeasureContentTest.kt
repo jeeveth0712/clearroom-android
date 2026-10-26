@@ -18,6 +18,8 @@ import com.clearroom.app.data.FanState
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.measure.ClapProblem
+import com.clearroom.app.measure.ClapTake
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.permission.MicAccess
 import com.clearroom.app.ui.MeasurePhase
@@ -140,7 +142,7 @@ class MeasureContentTest {
     fun aMeasuredSeat_showsItsSevenBandsAndFanState() {
         show(measure = MeasureUiState(selectedSeat = SeatId(2, 3)))
         node(R.string.measure_noise_result, text(R.string.fans_fast)).assertIsDisplayed()
-        compose.onNodeWithText(text(R.string.seat_label, 3, 4)).assertIsDisplayed()
+        node(R.string.seat_label, 3, 4).assertIsDisplayed()
     }
 
     @Test
@@ -163,6 +165,61 @@ class MeasureContentTest {
     fun recording_saysWhatIsBeingRecorded() {
         show(measure = MeasureUiState(phase = MeasurePhase.Recording(MeasureKind.VOICE)))
         node(R.string.measure_recording_voice, MeasureKind.VOICE.durationS).assertIsDisplayed()
+    }
+
+    // --- Echo (clap test) card --------------------------------------------------------------
+
+    @Test
+    fun clapTest_needsASeat_thenStartsAClapMeasurement() {
+        show(measure = MeasureUiState(selectedSeat = SeatId(1, 1)))
+        node(R.string.measure_clap_start, 0, ClapTake.TAKES_PER_SEAT).assertIsEnabled().performClick()
+        assertEquals(UiEvent.StartMeasurement(MeasureKind.CLAP), events.last())
+    }
+
+    @Test
+    fun clapTest_isDisabled_beforeASeatIsPicked() {
+        show(measure = MeasureUiState(selectedSeat = null))
+        node(R.string.measure_clap_start, 0, ClapTake.TAKES_PER_SEAT).assertIsNotEnabled()
+    }
+
+    @Test
+    fun choosingTheLongerDelay_sendsIt() {
+        show(measure = MeasureUiState(selectedSeat = SeatId(1, 1)))
+        node(R.string.measure_clap_delay_option, 10).performClick()
+        assertEquals(UiEvent.SetClapDelay(10), events.last())
+    }
+
+    @Test
+    fun aSeatWithClaps_showsItsEchoTime_andCanClearThem() {
+        show(measure = MeasureUiState(selectedSeat = SeatId(2, 3))) // the sample's seat with three claps
+        node(R.string.measure_clap_start, 3, ClapTake.TAKES_PER_SEAT).assertIsDisplayed()
+        node(R.string.measure_rt_title).assertIsDisplayed()
+        node(R.string.measure_rt_clear).performClick()
+        assertEquals(UiEvent.ClearClaps(SeatId(2, 3)), events.last())
+    }
+
+    @Test
+    fun recordingAClap_tellsTheUserToClapNow() {
+        show(measure = MeasureUiState(phase = MeasurePhase.Recording(MeasureKind.CLAP)))
+        node(R.string.measure_recording_clap).assertIsDisplayed()
+    }
+
+    @Test
+    fun anAcceptedClap_reportsTheCountAndEchoTime() {
+        show(measure = MeasureUiState(phase = MeasurePhase.ClapAccepted(SeatId(0, 1), takes = 2, speechRt60S = 1.1)))
+        node(R.string.measure_clap_saved, 2, ClapTake.TAKES_PER_SEAT, text(R.string.seat_label, 1, 2), 1.1).assertIsDisplayed()
+    }
+
+    @Test
+    fun aRejectedClap_saysWhatToDoDifferently() {
+        show(measure = MeasureUiState(phase = MeasurePhase.ClapRejected(ClapProblem.TOO_NOISY)))
+        node(R.string.clap_problem_noisy).assertIsDisplayed()
+    }
+
+    @Test
+    fun aClippedClap_saysClapSofter() {
+        show(measure = MeasureUiState(phase = MeasurePhase.Rejected(MeasureKind.CLAP, ClipQuality.CLIPPED)))
+        node(R.string.quality_clipped_clap).assertIsDisplayed()
     }
 
     @Test
