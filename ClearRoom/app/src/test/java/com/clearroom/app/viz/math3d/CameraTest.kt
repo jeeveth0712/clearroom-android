@@ -1,6 +1,7 @@
 package com.clearroom.app.viz.math3d
 
 import kotlin.math.PI
+import kotlin.math.sin
 import kotlin.math.sqrt
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -73,11 +74,13 @@ class CameraTest {
     @Test
     fun `the home view looks at the middle of the room from behind and above the back row`() {
         val home = OrbitCamera.homeView(widthM = 7.0, lengthM = 9.0, heightM = 3.0)
-        assertEquals(Vec3(3.5, 0.75, 4.5), home.target)
+        assertEquals(Vec3(3.5, 1.5, 4.5), home.target)
         assertTrue(home.eye.z > 9.0, "eye ${home.eye} should be behind the back wall")
         assertTrue(home.eye.y > 3.0, "eye ${home.eye} should be above the ceiling line")
+        assertTrue(home.eye.x > home.target.x, "turned a little to the right: ${home.eye}")
+        assertEquals(OrbitCamera.HOME_YAW_RAD, home.yawRad)
         val diagonal = sqrt(7.0 * 7.0 + 9.0 * 9.0 + 3.0 * 3.0)
-        assertEquals(1.3 * diagonal, home.distanceM, 1e-9)
+        assertEquals(0.9 * (diagonal / 2) / sin(Projection.DEFAULT_FOV_Y_RAD / 2), home.distanceM, 1e-9)
         assertTrue(home.distanceM in home.minDistanceM..home.maxDistanceM)
     }
 

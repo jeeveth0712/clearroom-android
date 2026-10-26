@@ -166,6 +166,8 @@
     <string name="results_3d_title">3D clarity room</string>
     <string name="results_3d_caption">Each bar is a seat: taller and bluer means clearer. The cone is the speaker. Drag to turn the room, pinch to zoom, double-tap to reset.</string>
     <string name="results_3d_description">3D view of the room. Front row: %1$s. Back row: %2$s.</string>
+    <string name="results_3d_label_speaker">Speaker</string>
+    <string name="results_3d_label_back">Back</string>
     <string name="results_uncalibrated">No voice reference yet, so a typical voice is assumed (uncalibrated). Record the voice on the Measure tab for your own result.</string>
     <string name="band_poor">Poor</string>
     <string name="band_fair">Fair</string>

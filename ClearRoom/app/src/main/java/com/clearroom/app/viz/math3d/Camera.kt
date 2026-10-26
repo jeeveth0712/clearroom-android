@@ -40,18 +40,23 @@ data class OrbitCamera(
     companion object {
         val MIN_PITCH_RAD = 5.0 * PI / 180
         val MAX_PITCH_RAD = 85.0 * PI / 180
+        val HOME_YAW_RAD = 25.0 * PI / 180
+        val HOME_PITCH_RAD = 38.0 * PI / 180
+        private const val HOME_MARGIN = 0.9 // the sphere is roomier than the room itself
 
         /**
-         * The home view (double-tap returns here): behind and above the back row, looking at the
-         * middle of the room, so the front with the speaker is at the top, as on the floor plan.
+         * The home view (double-tap returns here): above and behind the back row, turned a little to
+         * the right so bars show two sides, looking at the middle of the room. The front with the
+         * speaker is at the top, as on the floor plan. The distance comes from the room's bounding
+         * sphere, so rooms of any shape fill the view about the same.
          */
         fun homeView(widthM: Double, lengthM: Double, heightM: Double): OrbitCamera {
             val diagonal = sqrt(widthM * widthM + lengthM * lengthM + heightM * heightM)
             return OrbitCamera(
-                target = Vec3(widthM / 2, heightM / 4, lengthM / 2),
-                yawRad = 0.0,
-                pitchRad = 35.0 * PI / 180,
-                distanceM = 1.3 * diagonal,
+                target = Vec3(widthM / 2, heightM / 2, lengthM / 2),
+                yawRad = HOME_YAW_RAD,
+                pitchRad = HOME_PITCH_RAD,
+                distanceM = HOME_MARGIN * (diagonal / 2) / sin(Projection.DEFAULT_FOV_Y_RAD / 2),
                 minDistanceM = 0.5 * diagonal,
                 maxDistanceM = 4.0 * diagonal,
             )

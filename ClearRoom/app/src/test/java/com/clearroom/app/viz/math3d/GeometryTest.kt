@@ -32,8 +32,8 @@ class GeometryTest {
         val top = box.facing(Vec3(0.0, 1.0, 0.0))
         val bottom = box.facing(Vec3(0.0, -1.0, 0.0))
         assertTrue(top.shade > 0.9f, "top ${top.shade}")
-        assertEquals(0.35f, bottom.shade, 1e-6f)
-        assertTrue(box.all { it.shade in 0.35f..1f })
+        assertEquals(Face3.AMBIENT.toFloat(), bottom.shade, 1e-6f)
+        assertTrue(box.all { it.shade in Face3.AMBIENT.toFloat()..1f })
     }
 
     @Test
@@ -86,11 +86,52 @@ class GeometryTest {
     }
 
     @Test
-    fun `a wire box has its 12 edges, each along one axis`() {
-        val edges = Primitives.wireBox(Vec3(0.0, 0.0, 0.0), Vec3(7.0, 3.0, 9.0), grey)
-        assertEquals(12, edges.size)
-        val lengths = edges.map { (it.to - it.from).length }.sorted()
-        assertEquals(List(4) { 3.0 } + List(4) { 7.0 } + List(4) { 9.0 }, lengths)
+    fun `a floor rectangle lies flat, faces up and shows from both sides`() {
+        val tile = Primitives.floorRect(1.0, 2.0, 1.5, 2.5, grey)
+        assertEquals(Vec3(0.0, 1.0, 0.0), tile.normal)
+        assertFalse(tile.closedSolid)
+        assertTrue(tile.points.all { it.y == 0.0 })
+        assertEquals(Vec3(1.25, 0.0, 2.25), tile.centre)
+    }
+
+    @Test
+    fun `a floor rectangle needs a positive size`() {
+        assertFailsWith<IllegalArgumentException> { Primitives.floorRect(1.0, 2.0, 1.0, 3.0, grey) }
+    }
+
+    @Test
+    fun `the four walls face into the room`() {
+        val walls = Primitives.wallsFacingIn(widthM = 7.0, lengthM = 9.0, heightM = 3.0, color = grey)
+        val middle = Vec3(3.5, 1.5, 4.5)
+        assertEquals(4, walls.size)
+        walls.forEach { assertTrue(it.normal dot (middle - it.centre) > 0.0, "wall at ${it.centre} faces ${it.normal}") }
+        assertTrue(walls.all { it.closedSolid }, "one-sided, so the walls nearest the camera drop out")
+        assertEquals(3.0, walls.maxOf { wall -> wall.points.maxOf { it.y } })
+    }
+
+    @Test
+    fun `from outside the back, only the far three walls can be seen`() {
+        val walls = Primitives.wallsFacingIn(widthM = 7.0, lengthM = 9.0, heightM = 3.0, color = grey)
+        val behindTheBackWall = Vec3(3.5, 8.0, 20.0)
+        assertEquals(3, walls.count { it.facesTowards(behindTheBackWall) })
+    }
+
+    @Test
+    fun `a room needs a positive size`() {
+        assertFailsWith<IllegalArgumentException> { Primitives.wallsFacingIn(0.0, 9.0, 3.0, grey) }
+    }
+
+    @Test
+    fun `a solid's centre is the middle of its faces`() {
+        val bar = Solid(Primitives.box(Vec3(1.0, 0.0, 2.0), Vec3(2.0, 3.0, 4.0), grey))
+        assertEquals(1.5, bar.centre.x, 1e-12)
+        assertEquals(1.5, bar.centre.y, 1e-12)
+        assertEquals(3.0, bar.centre.z, 1e-12)
+    }
+
+    @Test
+    fun `a solid needs at least one face`() {
+        assertFailsWith<IllegalArgumentException> { Solid(emptyList()) }
     }
 }
 
