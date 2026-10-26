@@ -1,5 +1,6 @@
 package com.clearroom.app.ui.screens
 
+import android.content.res.Resources
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,12 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,10 +49,17 @@ internal fun BandRange(band: StiBand, low: Double, high: Double) {
 
 /** "Fair · 0.55–0.61", or "Fair · 0.59" when the range is narrower than the digits shown. */
 @Composable
-internal fun rangeText(band: StiBand, low: Double, high: Double): String {
+internal fun rangeText(band: StiBand, low: Double, high: Double): String = rangeText(LocalResources.current, band, low, high)
+
+/** [rangeText] outside Compose, for the report (FR-12). */
+fun rangeText(resources: Resources, band: StiBand, low: Double, high: Double): String {
     val (lowText, highText) = decimals(low, 2) to decimals(high, 2)
-    val name = stringResource(band.labelRes())
-    return if (lowText == highText) stringResource(R.string.results_band_value, name, lowText) else stringResource(R.string.results_band_range, name, lowText, highText)
+    val name = resources.getString(band.labelRes())
+    return if (lowText == highText) {
+        resources.getString(R.string.results_band_value, name, lowText)
+    } else {
+        resources.getString(R.string.results_band_range, name, lowText, highText)
+    }
 }
 
 /** The four clarity bands with their fixed colours; colour is never the only cue (names shown too). */
@@ -109,3 +124,34 @@ internal fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
 
 @Composable
 internal fun Body(@StringRes text: Int) = Text(stringResource(text), style = MaterialTheme.typography.bodyMedium)
+
+/**
+ * A button that asks before it acts: [button] draws it with the click that opens the question,
+ * and [onConfirm] runs only on [confirm]. For changes that are hard to undo.
+ */
+@Composable
+internal fun ConfirmFirst(
+    @StringRes title: Int,
+    body: String,
+    @StringRes confirm: Int,
+    @StringRes dismiss: Int,
+    onConfirm: () -> Unit,
+    button: @Composable (onClick: () -> Unit) -> Unit,
+) {
+    var asking by remember { mutableStateOf(false) }
+    button { asking = true }
+    if (asking) {
+        AlertDialog(
+            onDismissRequest = { asking = false },
+            title = { Text(stringResource(title)) },
+            text = { Text(body) },
+            confirmButton = {
+                TextButton(onClick = {
+                    asking = false
+                    onConfirm()
+                }) { Text(stringResource(confirm)) }
+            },
+            dismissButton = { TextButton(onClick = { asking = false }) { Text(stringResource(dismiss)) } },
+        )
+    }
+}

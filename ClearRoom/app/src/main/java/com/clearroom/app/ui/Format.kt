@@ -1,5 +1,9 @@
 package com.clearroom.app.ui
 
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
 import java.util.Locale
 import kotlin.math.roundToLong
 
@@ -12,3 +16,7 @@ fun Double.formatMetres(): String {
         String.format(Locale.ROOT, "%.2f", hundredths / 100.0).trimEnd('0')
     }
 }
+
+/** A moment as the phone shows dates, e.g. "27 Oct 2026, 14:30", in [zone]. */
+fun formatDateTime(millis: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
+    DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(locale).withZone(zone).format(Instant.ofEpochMilli(millis))

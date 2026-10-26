@@ -1,5 +1,6 @@
 package com.clearroom.app.viz
 
+import android.content.res.Resources
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -46,6 +48,9 @@ data class Rt60ChartModel(val bands: List<BandRt60>, val targetS: Double, val sp
 
     val anyEstimated: Boolean get() = bands.any { it.estimated }
 
+    /** The top of the echo-time axis: room above the target and the tallest whisker. */
+    val axisTopS: Double get() = maxOf(targetS * 1.25, bands.maxOf { it.meanS + it.spreadS } * 1.05)
+
     companion object {
         /** Null until a clap has been accepted somewhere in the room. */
         fun of(session: Session): Rt60ChartModel? =
@@ -55,29 +60,43 @@ data class Rt60ChartModel(val bands: List<BandRt60>, val targetS: Double, val sp
 
 @Composable
 fun Rt60Chart(model: Rt60ChartModel, modifier: Modifier = Modifier) {
+    val style = ChartStyle.fromTheme()
+    Column(modifier) {
+        Rt60Bars(model, model.axisTopS, Modifier.fillMaxWidth().height(220.dp))
+        Rt60Legend(model, style = style)
+        Text(rt60Caption(LocalResources.current, model), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+/** The V4 chart alone, on [axisTopS]: two of them on one scale compare before and after (FR-13). */
+@Composable
+fun Rt60Bars(model: Rt60ChartModel, axisTopS: Double, modifier: Modifier = Modifier) {
     val text = rememberTextMeasurer()
     val style = ChartStyle.fromTheme()
     val xTitle = stringResource(R.string.chart_pitch_hz)
     val yTitle = stringResource(R.string.chart_echo_time_s)
-    val target = stringResource(R.string.results_rt_target, decimals(model.targetS, 1))
-    val tooLong = stringResource(R.string.results_rt_too_long)
-    val caption = buildString {
-        val speech = decimals(model.speechRt60S, 1)
-        val targetText = decimals(model.targetS, 1)
-        append(stringResource(if (model.speechOverTarget) R.string.results_rt_caption_over else R.string.results_rt_caption_ok, speech, targetText))
-        model.hint?.let { append(' ').append(stringResource(it.textRes())) }
-        if (model.anyEstimated) append(' ').append(stringResource(R.string.results_rt_estimated))
+    val caption = rt60Caption(LocalResources.current, model)
+    Canvas(modifier.semantics { contentDescription = caption }) {
+        drawRt60Chart(model, xTitle, yTitle, style, text, axisTopS)
     }
-    Column(modifier) {
-        Canvas(Modifier.fillMaxWidth().height(220.dp).semantics { contentDescription = caption }) {
-            drawRt60Chart(model, xTitle, yTitle, style, text)
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Swatch(style.axis, target)
-            if (model.overTarget.any { it }) Swatch(ChartColors.TooLong, tooLong)
-        }
-        Text(caption, style = MaterialTheme.typography.bodySmall)
+}
+
+/** The target line and, if any bar in [models] is over it, the amber "too long" part. One legend can serve a before/after pair. */
+@Composable
+fun Rt60Legend(vararg models: Rt60ChartModel, style: ChartStyle = ChartStyle.fromTheme()) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Swatch(style.axis, stringResource(R.string.results_rt_target, decimals(models.first().targetS, 1)))
+        if (models.any { model -> model.overTarget.any { it } }) Swatch(ChartColors.TooLong, stringResource(R.string.results_rt_too_long))
     }
+}
+
+/** What V4 shows, in words: the echo at speech pitches against the target, and which absorber helps. */
+fun rt60Caption(resources: Resources, model: Rt60ChartModel): String = buildString {
+    val speech = decimals(model.speechRt60S, 1)
+    val targetText = decimals(model.targetS, 1)
+    append(resources.getString(if (model.speechOverTarget) R.string.results_rt_caption_over else R.string.results_rt_caption_ok, speech, targetText))
+    model.hint?.let { append(' ').append(resources.getString(it.textRes())) }
+    if (model.anyEstimated) append(' ').append(resources.getString(R.string.results_rt_estimated))
 }
 
 private fun EchoHint.textRes(): Int = when (this) {
@@ -86,9 +105,16 @@ private fun EchoHint.textRes(): Int = when (this) {
     EchoHint.HIGH_PITCHES -> R.string.results_rt_hint_high
 }
 
-fun DrawScope.drawRt60Chart(model: Rt60ChartModel, xTitle: String, yTitle: String, style: ChartStyle, text: TextMeasurer) {
-    val top = maxOf(model.targetS * 1.25, model.bands.maxOf { it.meanS + it.spreadS } * 1.05)
-    val y = Axis.upTo(top, maxCount = 4)
+/** [axisTopS] lets two charts share one scale (before and after, FR-13), so equal bars look equal. */
+fun DrawScope.drawRt60Chart(
+    model: Rt60ChartModel,
+    xTitle: String,
+    yTitle: String,
+    style: ChartStyle,
+    text: TextMeasurer,
+    axisTopS: Double = model.axisTopS,
+) {
+    val y = Axis.upTo(axisTopS, maxCount = 4)
     val area = drawFrame(BAND_AXIS, y, BAND_TICKS, y.ticks(4).map { Tick(it, decimals(it, 1)) }, xTitle, yTitle, style, text)
     val barHalf = (area.px(0.3) - area.px(0.0))
     model.bands.forEachIndexed { band, rt ->

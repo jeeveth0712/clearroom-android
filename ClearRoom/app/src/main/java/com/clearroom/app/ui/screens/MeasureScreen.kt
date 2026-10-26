@@ -103,6 +103,7 @@ fun MeasureContent(
 @Composable
 private fun Measurements(session: Session, measure: MeasureUiState, liveLevelDb: () -> Double, onEvent: (UiEvent) -> Unit) {
     val busy = measure.phase.isBusy
+    if (session.baseline != null) InfoCard { BodyText(R.string.measure_remeasuring) }
     StatusCard(measure.phase, liveLevelDb, onCancel = { onEvent(UiEvent.CancelRecording) })
 
     InfoCard {
@@ -279,7 +280,7 @@ private fun BodyText(@StringRes text: Int) = Text(stringResource(text), style = 
 private fun seatLabel(seat: SeatId): String = stringResource(R.string.seat_label, seat.row + 1, seat.col + 1)
 
 @StringRes
-private fun FanState.labelRes(): Int = when (this) {
+internal fun FanState.labelRes(): Int = when (this) {
     FanState.OFF -> R.string.fans_off
     FanState.SLOW -> R.string.fans_slow
     FanState.FAST -> R.string.fans_fast

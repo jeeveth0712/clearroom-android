@@ -1,5 +1,6 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.audio.AudioSourceKind
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -21,7 +22,9 @@ object RoomJson {
         .put("savedAtMillis", savedAtMillis)
         .put("room", encodeRoom(session.room))
         .put("voiceDb", session.voice?.let { numbers(it.valuesDb) } ?: JSONObject.NULL)
-        .put("seats", JSONArray().apply { session.seats.forEach { put(encodeSeat(it)) } })
+        .put("seats", seatsJson(session.seats))
+        .put("mic", session.mic?.let { JSONObject().put("source", it.source.name).put("sampleRateHz", it.sampleRateHz) } ?: JSONObject.NULL)
+        .put("baseline", session.baseline?.let(::encodeBaseline) ?: JSONObject.NULL)
         .toString(2)
 
     /** @throws RoomFormatException when the text isn't a room this app version can read. */
@@ -32,11 +35,16 @@ object RoomJson {
             throw RoomFormatException("saved by a newer ClearRoom (schema $version, this app reads up to $SCHEMA_VERSION)")
         }
         val current = migrate(json, fromVersion = version)
+        val room = decodeRoom(current.getJSONObject("room"))
         StoredSession(
             session = Session(
-                room = decodeRoom(current.getJSONObject("room")),
-                voice = if (current.isNull("voiceDb")) null else BandLevels(doubles(current.getJSONArray("voiceDb"))),
+                room = room,
+                voice = voiceOf(current),
                 seats = current.getJSONArray("seats").objects().map(::decodeSeat),
+                // Both arrived after the first files were written: a file without them reads as none.
+                mic = current.optJSONObject("mic")?.let { orNull { MicSetup(AudioSourceKind.valueOf(it.getString("source")), it.getInt("sampleRateHz")) } },
+                // Checked against the room the way a session checks it, so a bad "before" can't sink the room.
+                baseline = current.optJSONObject("baseline")?.let { orNull { decodeBaseline(it).also { before -> Session(room, baseline = before) } } },
             ),
             savedAtMillis = current.getLong("savedAtMillis"),
         )
@@ -51,6 +59,18 @@ object RoomJson {
         if (fromVersion < 1) throw RoomFormatException("unknown schema version $fromVersion")
         return json
     }
+
+    private fun voiceOf(json: JSONObject): BandLevels? = if (json.isNull("voiceDb")) null else BandLevels(doubles(json.getJSONArray("voiceDb")))
+
+    private fun seatsJson(seats: List<SeatMeasure>) = JSONArray().apply { seats.forEach { put(encodeSeat(it)) } }
+
+    private fun encodeBaseline(baseline: Baseline) = JSONObject()
+        .put("takenAtMillis", baseline.takenAtMillis)
+        .put("voiceDb", baseline.voice?.let { numbers(it.valuesDb) } ?: JSONObject.NULL)
+        .put("seats", seatsJson(baseline.seats))
+
+    private fun decodeBaseline(json: JSONObject) =
+        Baseline(json.getLong("takenAtMillis"), voiceOf(json), json.getJSONArray("seats").objects().map(::decodeSeat))
 
     private fun encodeRoom(room: Room) = JSONObject()
         .put("id", room.id)
@@ -103,12 +123,15 @@ object RoomJson {
         fans = if (json.isNull("fans")) null else FanState.valueOf(json.getString("fans")),
         rtTakes = json.getJSONArray("rtTakes").arrays().map { RtTake(nullableDoubles(it)) },
         // Rooms saved before the curves were kept have no "lastClap" at all: read that as none.
-        lastClap = json.optJSONObject("lastClap")?.let(::decodeCurvesOrNull),
+        lastClap = json.optJSONObject("lastClap")?.let { orNull { decodeCurves(it) } },
     )
 
-    /** Damaged curves only lose the charts they feed (V3, V10), never the room and its readings. */
-    private fun decodeCurvesOrNull(json: JSONObject): ClapCurves? = try {
-        decodeCurves(json)
+    /**
+     * For the parts a room can do without: damaged clap curves only lose the charts they feed (V3,
+     * V10), a damaged "before" only the comparison, never the room and its current readings.
+     */
+    private inline fun <T> orNull(decode: () -> T): T? = try {
+        decode()
     } catch (e: JSONException) {
         null
     } catch (e: IllegalArgumentException) {

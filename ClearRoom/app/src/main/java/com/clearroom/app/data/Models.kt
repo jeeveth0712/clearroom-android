@@ -1,5 +1,6 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.audio.AudioSourceKind
 import com.clearroom.app.dsp.DspConstants
 import com.clearroom.app.dsp.OctaveBands
 
@@ -128,20 +129,63 @@ data class SeatMeasure(
     val hasReadings: Boolean get() = noise != null || rtTakes.isNotEmpty()
 }
 
+/** How the room's latest reading was captured, for the report's measurement conditions (FR-12). */
+data class MicSetup(val source: AudioSourceKind, val sampleRateHz: Int) {
+    init {
+        require(sampleRateHz > 0) { "sample rate must be > 0, was $sampleRateHz" }
+    }
+}
+
+/**
+ * FR-13: the readings as they were before a change, kept when re-measuring starts (Memento). The
+ * session's own readings then fill in "after"; the room itself is shared by both.
+ */
+data class Baseline(val takenAtMillis: Long, val voice: BandLevels?, val seats: List<SeatMeasure>)
+
 /** A room plus its measurements. Audio is never part of it (NFR-6). */
 data class Session(
     val room: Room,
     val voice: BandLevels? = null,
     val seats: List<SeatMeasure> = emptyList(),
+    /** How the latest reading was captured; null before any, and for rooms saved before this was kept. */
+    val mic: MicSetup? = null,
+    /** FR-13: the readings from before a change while re-measuring; null otherwise. */
+    val baseline: Baseline? = null,
 ) {
     init {
-        require(seats.all { it.row < room.rows && it.col < room.cols }) { "a measured seat lies outside the grid" }
-        require(seats.distinctBy { it.row to it.col }.size == seats.size) { "a seat is measured twice" }
+        requireSeatsFit(seats, room)
+        baseline?.let { requireSeatsFit(it.seats, room) }
     }
 
-    /** The same session for an edited room, dropping measurements of seats that no longer exist. */
-    fun withRoom(newRoom: Room): Session =
-        copy(room = newRoom, seats = seats.filter { it.row < newRoom.rows && it.col < newRoom.cols })
+    /** The same session for an edited room, dropping measurements of seats that no longer exist (before and after). */
+    fun withRoom(newRoom: Room): Session = copy(
+        room = newRoom,
+        seats = seats.inside(newRoom),
+        baseline = baseline?.let { it.copy(seats = it.seats.inside(newRoom)) },
+    )
+
+    /** The room as it was before the change, measured with the "before" readings; null when not comparing. */
+    val before: Session? get() = baseline?.let { Session(room, it.voice, it.seats) }
+
+    /**
+     * FR-13: keeps the current readings as "before" and clears the seats for new readings. The
+     * voice reference stays: a change to the room hardly changes the voice at 1 m. A comparison
+     * already running keeps its "before".
+     */
+    fun startRemeasuring(atMillis: Long): Session =
+        if (baseline != null) this else copy(baseline = Baseline(atMillis, voice, seats), seats = emptyList())
+
+    /**
+     * Ends a comparison. New readings win and "before" is dropped; with nothing measured since it
+     * started, the "before" readings come back, so ending early never loses a measurement.
+     */
+    fun endComparison(): Session = when {
+        baseline == null -> this
+        seats.isEmpty() -> copy(voice = voice ?: baseline.voice, seats = baseline.seats, baseline = null)
+        else -> copy(baseline = null)
+    }
+
+    fun withMic(setup: MicSetup): Session = copy(mic = setup)
 
     fun contains(seat: SeatId): Boolean = seat.row < room.rows && seat.col < room.cols
 
@@ -169,6 +213,15 @@ data class Session(
         require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
         val updated = change(measureAt(seat) ?: SeatMeasure(seat.row, seat.col))
         return copy(seats = (seats.filterNot { it.seat == seat } + updated).sortedWith(compareBy({ it.row }, { it.col })))
+    }
+
+    private companion object {
+        fun requireSeatsFit(seats: List<SeatMeasure>, room: Room) {
+            require(seats.all { it.row < room.rows && it.col < room.cols }) { "a measured seat lies outside the grid" }
+            require(seats.distinctBy { it.row to it.col }.size == seats.size) { "a seat is measured twice" }
+        }
+
+        fun List<SeatMeasure>.inside(room: Room) = filter { it.row < room.rows && it.col < room.cols }
     }
 }
 

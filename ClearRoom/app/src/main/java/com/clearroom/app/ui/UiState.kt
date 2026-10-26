@@ -20,6 +20,7 @@ import com.clearroom.app.daylog.LogStats
 import com.clearroom.app.daylog.LogSummary
 import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
+import java.io.File
 
 /** Everything the screens show, one immutable value. Only AppViewModel writes it. */
 data class UiState(
@@ -29,7 +30,16 @@ data class UiState(
     val measure: MeasureUiState = MeasureUiState(),
     /** The Fixes tab's what-if controls; back to "as measured" whenever another room is opened. */
     val fixes: FixSettings = FixSettings(),
+    val report: ReportState = ReportState.Idle,
 )
+
+/** The report button (FR-12). [Ready] goes to the share sheet once; the screen then sends [UiEvent.ReportShown]. */
+sealed interface ReportState {
+    data object Idle : ReportState
+    data object Writing : ReportState
+    data class Ready(val file: File) : ReportState
+    data object Failed : ReportState
+}
 
 /**
  * A clarity result together with the session it was worked out from. It's computed off the main
@@ -41,10 +51,13 @@ data class Evaluation(
     val result: ClarityResult,
     /** Clarity across the whole floor (V1 heatmap, V9 terrain); null while the result is NeedsMore. */
     val grid: ClarityGrid? = null,
+    /** FR-13: the same room with the readings from before a change, while re-measuring; null otherwise. */
+    val before: Evaluation? = null,
 ) {
     companion object {
         /** Everything the Results tab needs for [session]. Does the maths: call it off the main thread. */
-        fun of(session: Session) = Evaluation(session, ClarityModel.evaluate(session), ClarityModel.floorGrid(session))
+        fun of(session: Session): Evaluation =
+            Evaluation(session, ClarityModel.evaluate(session), ClarityModel.floorGrid(session), session.before?.let(::of))
     }
 }
 
@@ -140,4 +153,9 @@ sealed interface UiEvent {
     data object StartLog : UiEvent
     data object StopLog : UiEvent
     data object ClearLogs : UiEvent
+
+    data object ShareReport : UiEvent
+    data object ReportShown : UiEvent
+    data object StartRemeasuring : UiEvent
+    data object StopComparing : UiEvent
 }

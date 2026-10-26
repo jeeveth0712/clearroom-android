@@ -362,6 +362,77 @@
     <string name="sound_quiet">quiet</string>
     <string name="sound_other">other sounds</string>
 
+    <!-- Results: share the report (FR-12) -->
+    <string name="results_share">Share report (PDF)</string>
+    <string name="results_share_writing">Making the report…</string>
+    <string name="results_share_failed">Couldn’t make the report. Check the phone has free storage, then try again.</string>
+
+    <!-- Results: before and after a change (FR-13) -->
+    <string name="compare_offer_title">Made a change?</string>
+    <string name="compare_offer_body">Hung curtains or switched off the fans? Keep today’s results as ‘before’, then measure the same seats again to see what the change did.</string>
+    <string name="compare_start">Re-measure after a change</string>
+    <string name="compare_start_title">Start re-measuring?</string>
+    <string name="compare_start_body">Today’s readings are kept as ‘before’, and the seats are cleared for new claps and noise readings. The voice reading stays.</string>
+    <string name="compare_start_confirm">Start</string>
+    <string name="compare_cancel">Cancel</string>
+    <string name="compare_title">Before and after</string>
+    <string name="compare_kept">‘Before’ kept on %1$s.</string>
+    <string name="compare_measure_again">Now measure the same seats again on the Measure tab: claps and background noise.</string>
+    <string name="compare_before_line">Before: %1$s</string>
+    <string name="compare_after_line">After: %1$s</string>
+    <string name="compare_before">Before</string>
+    <string name="compare_after">After</string>
+    <string name="compare_echo_before">Echo time by pitch, before</string>
+    <string name="compare_echo_after">Echo time by pitch, after</string>
+    <string name="compare_caption">Both maps use the same colours and both echo charts the same scale, so a difference you see is a real change.</string>
+    <string name="compare_stop">Stop comparing</string>
+    <string name="compare_stop_title">Stop comparing?</string>
+    <string name="compare_stop_body_new">The ‘before’ readings are dropped; the new readings stay.</string>
+    <string name="compare_stop_body_restore">Nothing new was measured yet, so the earlier readings come back.</string>
+    <string name="compare_keep">Keep comparing</string>
+    <string name="measure_remeasuring">Re-measuring after a change: new readings fill in ‘after’, and ‘before’ stays on the Results tab.</string>
+
+    <!-- The one-page PDF report (FR-12); scores always with their range (NFR-10) -->
+    <string name="report_title">ClearRoom report</string>
+    <!-- %1$s room name, %2$s date and time -->
+    <string name="report_room_line">%1$s · %2$s</string>
+    <!-- %1$s–%3$s length, width and height in m, %4$s is room_plan_rows, %5$s is room_plan_seats_per_row -->
+    <string name="report_size">%1$s × %2$s × %3$s m · %4$s of %5$s</string>
+    <string name="report_sample">Sample room: made-up readings for exploring the app, not a measurement.</string>
+    <!-- %1$s band with range, %2$s cause -->
+    <string name="report_verdict">%1$s · main cause: %2$s</string>
+    <!-- %1$s date and time, %2$s band with range -->
+    <string name="report_before">Before the change (readings kept %1$s), back rows: %2$s</string>
+    <string name="report_uncalibrated">No voice reference: a typical voice is assumed, so the scores are uncalibrated.</string>
+    <string name="report_map_title">Clarity at each seat</string>
+    <string name="report_map_before">Clarity at each seat, before</string>
+    <string name="report_map_after">Clarity at each seat, after</string>
+    <string name="report_map_caption">The speaker (dark dot) is at the top, at the front. Seats with a white dot were measured; the colours between them are worked out.</string>
+    <string name="report_legend_poor">Poor: under 0.45</string>
+    <string name="report_legend_fair">Fair: 0.45–0.60</string>
+    <string name="report_legend_good">Good: 0.60–0.75</string>
+    <string name="report_legend_excellent">Excellent: 0.75 and up</string>
+    <!-- %1$d rank, %2$s the change, %3$s gain or gain range, %4$s cost class -->
+    <string name="report_fix">%1$d. %2$s: %3$s (%4$s)</string>
+    <string name="report_fix_range">%1$s to %2$s</string>
+    <string name="report_fixes_none">None of the ready-made changes lifts the back row on its own.</string>
+    <string name="report_fixes_note">Predicted by ClearRoom’s room model from these readings; the range comes from the spread of the claps. Costs are rough guides.</string>
+    <string name="report_conditions_title">How it was measured</string>
+    <!-- %1$s sample rate in kHz -->
+    <string name="report_mic_unprocessed">Microphone: the phone’s unprocessed input at %1$s kHz, with no automatic gain or noise suppression.</string>
+    <string name="report_mic_voice">Microphone: the phone’s voice-recognition input at %1$s kHz, with no automatic gain; noise suppression and echo cancelling switched off.</string>
+    <string name="report_mic_unknown">Microphone: input not recorded for these readings.</string>
+    <string name="report_seats">Seats measured: %1$d of %2$d. The others are worked out from them.</string>
+    <string name="report_readings">Claps accepted: %1$d. Background noise readings: %2$d.</string>
+    <string name="report_fans">Fans or AC during the noise readings: %1$s.</string>
+    <string name="report_students">Measured as an empty room; students usually present: %1$d</string>
+    <string name="report_voice_measured">Speaker’s voice: measured at 1 m while reading aloud.</string>
+    <string name="report_voice_typical">Speaker’s voice: not measured, so a typical 60 dBA voice is assumed (uncalibrated).</string>
+    <string name="report_echo">Echo time at speech pitches (500 Hz–2 kHz): %1$s s, from every accepted clap.</string>
+    <string name="report_footer_scale">Scores are on the Speech Transmission Index scale: 0 means no words are understood, 1 every word; 0.60 or more is easy to follow.</string>
+    <string name="report_footer">An estimate from a phone measurement made with ClearRoom, not a standards compliance test.</string>
+    <string name="report_share_title">Share the ClearRoom report</string>
+
     <!-- Chart axes and legends -->
     <string name="chart_pitch_hz">Pitch (Hz)</string>
     <string name="chart_echo_time_s">Echo time (s)</string>

@@ -1,6 +1,9 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.audio.AudioSourceKind
+import com.clearroom.app.testing.aMeasuredSeat
 import com.clearroom.app.testing.aRoom
+import com.clearroom.app.testing.flatBands
 import org.json.JSONObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -94,5 +97,36 @@ class RoomJsonTest {
         val loaded = RoomJson.decode(damaged).session
         assertEquals(null, loaded.measureAt(SeatId(0, 1))?.lastClap)
         assertEquals(session.measureAt(SeatId(0, 1))?.rtTakes, loaded.measureAt(SeatId(0, 1))?.rtTakes)
+    }
+
+    @Test
+    fun `before-readings and the microphone setup survive a save and load`() {
+        val session = Session(aRoom(), voice = flatBands(-30.0), seats = listOf(aMeasuredSeat(0, 1)))
+            .startRemeasuring(atMillis = 1_800_000_000_000L)
+            .withNoise(SeatId(2, 2), flatBands(-48.5), FanState.FAST)
+            .withMic(MicSetup(AudioSourceKind.VOICE_RECOGNITION, 44_100))
+        assertEquals(session, roundTrip(session).session)
+    }
+
+    @Test
+    fun `a room saved before comparisons and microphone notes still loads, with neither`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 1)))
+        val old = JSONObject(RoomJson.encode(session, 1L)).apply {
+            remove("mic")
+            remove("baseline")
+        }.toString()
+        assertEquals(session, RoomJson.decode(old).session)
+    }
+
+    @Test
+    fun `a damaged before or microphone note is dropped, but the room and its readings still load`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 1))).startRemeasuring(5L)
+            .withNoise(SeatId(1, 1), flatBands(-50.0), FanState.OFF)
+            .withMic(MicSetup(AudioSourceKind.UNPROCESSED, 48_000))
+        val damaged = JSONObject(RoomJson.encode(session, 1L)).apply {
+            getJSONObject("baseline").getJSONArray("seats").getJSONObject(0).put("row", 99) // outside the grid
+            getJSONObject("mic").put("source", "TELEPATHY")
+        }.toString()
+        assertEquals(session.copy(baseline = null, mic = null), RoomJson.decode(damaged).session)
     }
 }

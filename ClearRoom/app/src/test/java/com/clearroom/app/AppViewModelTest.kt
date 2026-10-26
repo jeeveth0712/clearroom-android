@@ -3,10 +3,12 @@ package com.clearroom.app
 import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.MissingInput
+import com.clearroom.app.audio.AudioSourceKind
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.FieldProblem
+import com.clearroom.app.data.MicSetup
 import com.clearroom.app.data.RoomField
 import com.clearroom.app.data.RtTake
 import com.clearroom.app.data.SampleData
@@ -20,6 +22,7 @@ import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.testing.FakeAudioInput
+import com.clearroom.app.testing.FakeReportWriter
 import com.clearroom.app.testing.InMemoryLogStore
 import com.clearroom.app.testing.InMemoryRoomRepository
 import com.clearroom.app.testing.MainDispatcherRule
@@ -30,6 +33,7 @@ import com.clearroom.app.testing.aRoom
 import com.clearroom.app.testing.aValidForm
 import com.clearroom.app.testing.flatBands
 import com.clearroom.app.ui.MeasurePhase
+import com.clearroom.app.ui.ReportState
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.UiEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -40,6 +44,7 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -59,10 +64,11 @@ class AppViewModelTest {
     private val rooms = InMemoryRoomRepository()
     private val logs = InMemoryLogStore()
     private val labeller = ScriptedLabeller(List(100) { SoundLabel.FAN })
+    private val reports = FakeReportWriter()
     private var idCounter = 0
 
     private fun newViewModel() = AppViewModel(
-        audio, rooms, logs, { labeller },
+        audio, rooms, logs, { labeller }, reports,
         dsp = main.dispatcher, io = main.dispatcher, clock = { 1_000_000L }, newRoomId = { "new-${++idCounter}" },
     )
 
@@ -717,5 +723,92 @@ class AppViewModelTest {
         assertNull(logs.latest("r1"))
         assertEquals(0, assertNotNull(vm.log.value).log.seconds.size)
         assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(0, 0)))
+    }
+
+    // --- Report and before/after (M11) ---------------------------------------------------------------
+
+    @Test
+    fun `a saved reading records how the microphone captured it, for the report`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(1, 1)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceUntilIdle()
+        assertEquals(MicSetup(AudioSourceKind.UNPROCESSED, FakeAudioInput.SAMPLE_RATE), assertNotNull(rooms.load("r1")).mic)
+    }
+
+    @Test
+    fun `sharing writes the open room's report, then hands it over once`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.ShareReport)
+        assertEquals(ReportState.Writing, vm.state.value.report)
+        runCurrent()
+        assertEquals(ReportState.Ready(File("report-1.pdf")), vm.state.value.report)
+        val report = reports.written.single()
+        assertEquals(SampleData.session, report.session)
+        assertEquals(1_000_000L, report.createdAtMillis)
+        vm.onEvent(UiEvent.ReportShown)
+        assertEquals(ReportState.Idle, vm.state.value.report)
+    }
+
+    @Test
+    fun `a report that can't be written says so`() = runTest {
+        reports.failWrites = true
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.ShareReport)
+        runCurrent()
+        assertEquals(ReportState.Failed, vm.state.value.report)
+    }
+
+    @Test
+    fun `a room without results has no report to share`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.ShareReport)
+        runCurrent()
+        assertEquals(ReportState.Failed, vm.state.value.report)
+        assertEquals(emptyList(), reports.written)
+        viewModel.onEvent(UiEvent.ShareReport) // no room open at all: nothing happens
+        assertEquals(ReportState.Idle, viewModel.state.value.report)
+    }
+
+    @Test
+    fun `opening another room forgets the last report`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.ShareReport)
+        runCurrent()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        assertEquals(ReportState.Idle, vm.state.value.report)
+    }
+
+    @Test
+    fun `re-measuring keeps the readings as before, saved, and starts after empty`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0), aMeasuredSeat(4, 5))
+        vm.onEvent(UiEvent.StartRemeasuring)
+        runCurrent()
+        val stored = assertNotNull(rooms.load("r1"))
+        assertEquals(1_000_000L, stored.baseline?.takenAtMillis)
+        assertEquals(listOf(aMeasuredSeat(0, 0), aMeasuredSeat(4, 5)), stored.baseline?.seats)
+        assertEquals(emptyList(), stored.seats)
+        assertEquals(stored, vm.state.value.session)
+    }
+
+    @Test
+    fun `stopping a comparison with nothing new measured brings the readings back`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.StartRemeasuring)
+        runCurrent()
+        vm.onEvent(UiEvent.StopComparing)
+        runCurrent()
+        assertEquals(Session(aRoom(id = "r1"), seats = listOf(aMeasuredSeat(0, 0))), rooms.load("r1"))
+    }
+
+    @Test
+    fun `the sample room can't be re-measured`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.StartRemeasuring)
+        runCurrent()
+        assertEquals(SampleData.session, vm.state.value.session)
     }
 }

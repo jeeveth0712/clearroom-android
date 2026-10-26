@@ -1,8 +1,10 @@
 package com.clearroom.app.ui
 
+import java.time.ZoneId
 import java.util.Locale
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class FormatTest {
 
@@ -34,5 +36,13 @@ class FormatTest {
         } finally {
             Locale.setDefault(original)
         }
+    }
+
+    @Test
+    fun `dates read the way the phone writes them, in its time zone`() {
+        val moment = 1_800_000_000_000L // 15 Jan 2027, 08:00 UTC
+        val utc = formatDateTime(moment, ZoneId.of("UTC"), Locale.UK)
+        assertTrue("15 Jan 2027" in utc && "08:00" in utc, utc)
+        assertTrue("13:30" in formatDateTime(moment, ZoneId.of("Asia/Kolkata"), Locale.UK))
     }
 }

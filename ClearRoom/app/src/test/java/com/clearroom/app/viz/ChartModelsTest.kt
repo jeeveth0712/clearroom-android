@@ -178,4 +178,10 @@ class ChartModelsTest {
         val seat = clarity.at(SeatId(0, 0))
         assertEquals(SpectrumModel(seat.speechDb, seat.noiseDb), SpectrumModel.of(seat))
     }
+
+    @Test
+    fun `the echo axis tops out above the target and above the tallest whisker`() {
+        assertEquals(0.6 * 1.25, rt(0.4, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4).axisTopS, 1e-12)
+        assertEquals((1.2 + 0.05) * 1.05, rt(0.5, 0.6, 1.2, 0.8, 0.7, 0.6, 0.5).axisTopS, 1e-12)
+    }
 }

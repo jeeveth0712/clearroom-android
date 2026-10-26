@@ -263,4 +263,16 @@ class MeasureContentTest {
         show(measure = MeasureUiState(phase = MeasurePhase.SaveFailed))
         node(R.string.measure_save_failed).assertIsDisplayed()
     }
+
+    @Test
+    fun whileReMeasuring_saysWhereNewReadingsGo() {
+        show(session = ownRoom.startRemeasuring(1L))
+        node(R.string.measure_remeasuring).assertIsDisplayed()
+    }
+
+    @Test
+    fun normally_thereIsNoReMeasuringNote() {
+        show()
+        compose.onNodeWithText(text(R.string.measure_remeasuring)).assertDoesNotExist()
+    }
 }

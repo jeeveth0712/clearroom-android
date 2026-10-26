@@ -45,4 +45,13 @@ class ResultsLogicTest {
         assertIs<ClarityResult.NeedsMore>(evaluation.result)
         assertNull(evaluation.grid)
     }
+
+    @Test
+    fun `while re-measuring, an evaluation carries the room as it was before the change`() {
+        val mine = SampleData.session.copy(room = SampleData.room.copy(id = "mine"))
+        val evaluation = Evaluation.of(mine.startRemeasuring(5L))
+        assertIs<ClarityResult.NeedsMore>(evaluation.result)
+        assertEquals(Evaluation.of(mine), evaluation.before)
+        assertNull(Evaluation.of(mine).before)
+    }
 }

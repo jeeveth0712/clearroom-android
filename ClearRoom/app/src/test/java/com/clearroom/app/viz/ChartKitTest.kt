@@ -1,11 +1,13 @@
 package com.clearroom.app.viz
 
+import androidx.compose.ui.graphics.luminance
 import java.util.Locale
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertTrue
 
 class ChartKitTest {
 
@@ -98,5 +100,12 @@ class ChartKitTest {
         assertEquals("1 kHz", BAND_NAMES[3])
         assertEquals(listOf(0.0, 6.0), listOf(BAND_TICKS.first().value, BAND_TICKS.last().value))
         assertEquals(-0.5, BAND_AXIS.min)
+    }
+
+    @Test
+    fun `the print style is dark on white whatever the app's theme`() {
+        val style = ChartStyle.print()
+        listOf(style.axis, style.label.color).forEach { assertTrue(it.luminance() < 0.1f, "$it is too light for paper") }
+        assertTrue(style.grid.luminance() > 0.5f, "grid lines stay faint")
     }
 }

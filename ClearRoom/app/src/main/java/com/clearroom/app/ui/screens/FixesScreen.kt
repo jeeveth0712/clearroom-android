@@ -231,12 +231,13 @@ private fun VoiceCard(outcome: FixesOutcome) {
     }
 }
 
-private fun signedSti(value: Double): String = (if (value >= 0) "+" else "") + decimals(value, 2)
+/** A change in score with its sign: "+0.08", "-0.01". */
+internal fun signedSti(value: Double): String = (if (value >= 0) "+" else "") + decimals(value, 2)
 
 private fun signedDb(value: Double): String = (if (value > 0) "+" else "") + decimals(value, 0)
 
 @StringRes
-private fun FixPreset.nameRes(): Int = when (this) {
+internal fun FixPreset.nameRes(): Int = when (this) {
     FixPreset.CURTAINS -> R.string.fix_curtains
     FixPreset.FANS_OFF -> R.string.fix_fans_off
     FixPreset.MICROPHONE -> R.string.fix_microphone
@@ -245,7 +246,7 @@ private fun FixPreset.nameRes(): Int = when (this) {
 }
 
 @StringRes
-private fun CostTier.textRes(): Int = when (this) {
+internal fun CostTier.textRes(): Int = when (this) {
     CostTier.FREE -> R.string.cost_free
     CostTier.LOW -> R.string.cost_low
     CostTier.MEDIUM -> R.string.cost_medium

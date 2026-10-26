@@ -11,6 +11,7 @@ import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.data.FanState
+import com.clearroom.app.data.MicSetup
 import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.RoomRepository
 import com.clearroom.app.data.SampleData
@@ -27,11 +28,14 @@ import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasureOutcome
 import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.measure.bandLevelsOf
+import com.clearroom.app.report.Report
+import com.clearroom.app.report.ReportWriter
 import com.clearroom.app.ui.DayLogView
 import com.clearroom.app.ui.Evaluation
 import com.clearroom.app.ui.FixesView
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.MeasureUiState
+import com.clearroom.app.ui.ReportState
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.RoomUiState
 import com.clearroom.app.ui.UiEvent
@@ -57,17 +61,18 @@ import java.util.UUID
 
 /**
  * The app's single ViewModel (doc decision). It holds state and sequences work; recording is
- * [MeasurementRunner]'s job, analysis belongs to the engine (OctaveBank, Reverb, ClapTake) and
- * storage to [RoomRepository].
+ * [MeasurementRunner]'s job, analysis belongs to the engine (OctaveBank, Reverb, ClapTake),
+ * storage to [RoomRepository] and the PDF to [ReportWriter].
  */
 class AppViewModel(
     audio: AudioInput,
     private val rooms: RoomRepository,
     private val logs: LogStore,
     newLabeller: () -> SoundLabeller?,
-    dsp: CoroutineDispatcher = Dispatchers.Default,
+    private val reports: ReportWriter,
+    private val dsp: CoroutineDispatcher = Dispatchers.Default,
     private val io: CoroutineDispatcher = Dispatchers.IO,
-    clock: () -> Long = System::currentTimeMillis,
+    private val clock: () -> Long = System::currentTimeMillis,
     private val newRoomId: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
@@ -133,8 +138,8 @@ class AppViewModel(
             is UiEvent.StartMeasurement -> startMeasurement(event.kind)
             UiEvent.CancelRecording -> cancelMeasurement()
             is UiEvent.SetClapDelay -> setClapDelay(event.seconds)
-            is UiEvent.ClearClaps -> clearClaps(event.seat)
-            is UiEvent.ClearSeat -> clearSeat(event.seat)
+            is UiEvent.ClearClaps -> changeReadings { it.withoutClaps(event.seat) }
+            is UiEvent.ClearSeat -> changeReadings { it.withoutSeat(event.seat) }
             is UiEvent.RoomFormChanged -> updateRoom { it.copy(form = event.form, problems = emptyMap(), notice = null) }
             UiEvent.SaveRoom -> viewModelScope.launch { saveRoom() }
             UiEvent.NewRoom -> newRoom()
@@ -146,6 +151,10 @@ class AppViewModel(
             UiEvent.StartLog -> startLog()
             UiEvent.StopLog -> dayLog.stop()
             UiEvent.ClearLogs -> _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID }?.let(dayLog::clear)
+            UiEvent.ShareReport -> shareReport()
+            UiEvent.ReportShown -> _state.update { it.copy(report = ReportState.Idle) }
+            UiEvent.StartRemeasuring -> changeReadings { it.startRemeasuring(clock()) }
+            UiEvent.StopComparing -> changeReadings(Session::endComparison)
         }
     }
 
@@ -182,23 +191,23 @@ class AppViewModel(
     }
 
     private suspend fun measureNoise(roomId: String, seat: SeatId, fans: FanState): MeasurePhase =
-        record(MeasureKind.NOISE, analyse = ::bandLevelsOf).toPhase(MeasureKind.NOISE) { levels ->
-            if (saveMeasurement(roomId) { it.withNoise(seat, levels, fans) } == null) MeasurePhase.SaveFailed
+        record(MeasureKind.NOISE, analyse = ::bandLevelsOf).toPhase(MeasureKind.NOISE) { levels, mic ->
+            if (saveMeasurement(roomId) { it.withNoise(seat, levels, fans).withMic(mic) } == null) MeasurePhase.SaveFailed
             else MeasurePhase.Saved(MeasureKind.NOISE, seat)
         }
 
     private suspend fun measureVoice(roomId: String): MeasurePhase =
-        record(MeasureKind.VOICE, analyse = ::bandLevelsOf).toPhase(MeasureKind.VOICE) { levels ->
-            if (saveMeasurement(roomId) { it.withVoice(levels) } == null) MeasurePhase.SaveFailed
+        record(MeasureKind.VOICE, analyse = ::bandLevelsOf).toPhase(MeasureKind.VOICE) { levels, mic ->
+            if (saveMeasurement(roomId) { it.withVoice(levels).withMic(mic) } == null) MeasurePhase.SaveFailed
             else MeasurePhase.Saved(MeasureKind.VOICE, seat = null)
         }
 
     private suspend fun measureClap(roomId: String, seat: SeatId, delayS: Int): MeasurePhase =
-        record(MeasureKind.CLAP, delayS) { Reverb.analyse(it.samples, it.sampleRate) }.toPhase(MeasureKind.CLAP) { result ->
+        record(MeasureKind.CLAP, delayS) { Reverb.analyse(it.samples, it.sampleRate) }.toPhase(MeasureKind.CLAP) { result, mic ->
             when (val verdict = ClapTake.judge(result)) {
                 is ClapVerdict.Rejected -> MeasurePhase.ClapRejected(verdict.problem)
                 is ClapVerdict.Accepted -> {
-                    val saved = saveMeasurement(roomId) { it.withClap(seat, verdict.take, ClapTake.curvesOf(verdict.analysis)) }
+                    val saved = saveMeasurement(roomId) { it.withClap(seat, verdict.take, ClapTake.curvesOf(verdict.analysis)).withMic(mic) }
                     val speechRt60S = requireNotNull(Rt60Summary.of(listOf(verdict.take))).speechRt60S
                     if (saved == null) MeasurePhase.SaveFailed
                     else MeasurePhase.ClapAccepted(seat, saved.measureAt(seat)?.rtTakes?.size ?: 1, speechRt60S)
@@ -206,12 +215,11 @@ class AppViewModel(
             }
         }
 
-    private fun clearClaps(seat: SeatId) = clearReadings { it.withoutClaps(seat) }
-
-    private fun clearSeat(seat: SeatId) = clearReadings { it.withoutSeat(seat) }
-
-    /** Removes readings from the user's own room (never the sample), unless a recording is running. */
-    private fun clearReadings(change: (Session) -> Session) {
+    /**
+     * Changes the readings of the user's own room (never the sample) without measuring: clearing
+     * them, or starting and ending a before/after comparison (FR-13). Not while a recording runs.
+     */
+    private fun changeReadings(change: (Session) -> Session) {
         val roomId = _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
         if (_state.value.measure.phase.isBusy) return
         viewModelScope.launch {
@@ -229,10 +237,13 @@ class AppViewModel(
             analyse = analyse,
         )
 
-    /** Unusable recordings and microphone problems read the same for every kind of measurement. */
-    private inline fun <T> MeasureOutcome<T>.toPhase(kind: MeasureKind, onMeasured: (T) -> MeasurePhase): MeasurePhase =
+    /**
+     * Unusable recordings and microphone problems read the same for every kind of measurement. A
+     * usable one comes with how it was captured, for the report (FR-12).
+     */
+    private inline fun <T> MeasureOutcome<T>.toPhase(kind: MeasureKind, onMeasured: (T, MicSetup) -> MeasurePhase): MeasurePhase =
         when (this) {
-            is MeasureOutcome.Measured -> onMeasured(result)
+            is MeasureOutcome.Measured -> onMeasured(result, MicSetup(summary.source, summary.sampleRate))
             is MeasureOutcome.Rejected -> MeasurePhase.Rejected(kind, quality)
             is MeasureOutcome.Failed -> MeasurePhase.Failed(problem)
         }
@@ -264,6 +275,26 @@ class AppViewModel(
         measurement?.cancel()
         measurement = null
         setPhase(MeasurePhase.Idle)
+    }
+
+    // --- Report (FR-12) ----------------------------------------------------------------------
+
+    /** Writes the one-page report off the main thread; the screen hands the file to the share sheet. */
+    private fun shareReport() {
+        val session = _state.value.session ?: return
+        if (_state.value.report == ReportState.Writing) return
+        _state.update { it.copy(report = ReportState.Writing) }
+        viewModelScope.launch {
+            val report = withContext(dsp) { Report.of(session, clock()) }
+            val file = report?.let {
+                try {
+                    withContext(io) { reports.write(it) }
+                } catch (e: IOException) {
+                    null
+                }
+            }
+            _state.update { it.copy(report = file?.let(ReportState::Ready) ?: ReportState.Failed) }
+        }
     }
 
     // --- Rooms (FR-1) ------------------------------------------------------------------------
@@ -310,7 +341,9 @@ class AppViewModel(
     private fun newRoom() {
         dayLog.stop()
         dayLog.show(null)
-        _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null), fixes = FixSettings()) }
+        _state.update {
+            it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null), fixes = FixSettings(), report = ReportState.Idle)
+        }
     }
 
     private fun loadSampleRoom() = showSession(SampleData.session, notice = RoomNotice.SAMPLE_LOADED)
@@ -343,6 +376,7 @@ class AppViewModel(
                 // A seat choice carries over only within the same room, and only if the seat still exists.
                 measure = it.measure.copy(selectedSeat = it.measure.selectedSeat?.takeIf { seat -> sameRoom && session.contains(seat) }),
                 fixes = if (sameRoom) it.fixes else FixSettings(),
+                report = if (sameRoom) it.report else ReportState.Idle,
             )
         }
     }
@@ -359,7 +393,7 @@ class AppViewModel(
 
     companion object {
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
-            initializer { AppViewModel(container.audioInput, container.roomRepository, container.logStore, container::newSoundLabeller) }
+            initializer { AppViewModel(container.audioInput, container.roomRepository, container.logStore, container::newSoundLabeller, container.reportWriter) }
         }
     }
 }

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- What the FileProvider may share: only the report folder in the cache (FR-12). The rooms and
+     day logs in the app's files are never reachable from here. -->
+<paths>
+    <cache-path
+        name="reports"
+        path="reports/" />
+</paths>

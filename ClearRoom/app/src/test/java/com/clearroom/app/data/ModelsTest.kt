@@ -1,11 +1,13 @@
 package com.clearroom.app.data
 
+import com.clearroom.app.audio.AudioSourceKind
 import com.clearroom.app.testing.aMeasuredSeat
 import com.clearroom.app.testing.aRoom
 import com.clearroom.app.testing.flatBands
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertNull
 
 class ModelsTest {
 
@@ -226,5 +228,61 @@ class ModelsTest {
     @Test
     fun `wall area counts the four walls only`() {
         assertEquals(2 * (9.0 + 7.0) * 3.0, aRoom(lengthM = 9.0, widthM = 7.0, heightM = 3.0).wallAreaM2, 1e-12)
+    }
+
+    // --- Before and after (FR-13) --------------------------------------------------------------------
+
+    private val measured = Session(aRoom(), voice = flatBands(-30.0), seats = listOf(aMeasuredSeat(0, 0), aMeasuredSeat(4, 5)))
+
+    @Test
+    fun `re-measuring keeps the readings as before and clears the seats, but not the voice`() {
+        val remeasuring = measured.startRemeasuring(atMillis = 42L)
+        assertEquals(Baseline(42L, flatBands(-30.0), measured.seats), remeasuring.baseline)
+        assertEquals(emptyList(), remeasuring.seats)
+        assertEquals(flatBands(-30.0), remeasuring.voice)
+        assertEquals(measured, remeasuring.before)
+    }
+
+    @Test
+    fun `starting again while comparing keeps the first before`() {
+        val remeasuring = measured.startRemeasuring(42L).withNoise(SeatId(1, 1), flatBands(-50.0), FanState.OFF)
+        assertEquals(remeasuring, remeasuring.startRemeasuring(99L))
+    }
+
+    @Test
+    fun `there is no before unless re-measuring, and nothing to end`() {
+        assertNull(measured.before)
+        assertEquals(measured, measured.endComparison())
+    }
+
+    @Test
+    fun `ending a comparison keeps the new readings and drops before`() {
+        val ended = measured.startRemeasuring(42L).withNoise(SeatId(1, 1), flatBands(-50.0), FanState.OFF).endComparison()
+        assertNull(ended.baseline)
+        assertEquals(listOf(SeatId(1, 1)), ended.seats.map { it.seat })
+    }
+
+    @Test
+    fun `ending a comparison before measuring anything brings the earlier readings back`() {
+        assertEquals(measured, measured.startRemeasuring(42L).endComparison())
+    }
+
+    @Test
+    fun `a smaller room drops before-readings of seats that no longer exist, too`() {
+        val smaller = measured.startRemeasuring(42L).withRoom(aRoom(rows = 3, cols = 4))
+        assertEquals(listOf(aMeasuredSeat(0, 0)), smaller.baseline?.seats)
+    }
+
+    @Test
+    fun `before-readings must fit the room's grid like the current ones`() {
+        assertFailsWith<IllegalArgumentException> { Session(aRoom(rows = 2, cols = 2), baseline = Baseline(1L, null, listOf(aMeasuredSeat(2, 0)))) }
+        assertFailsWith<IllegalArgumentException> { Session(aRoom(), baseline = Baseline(1L, null, listOf(aMeasuredSeat(1, 1), aMeasuredSeat(1, 1)))) }
+    }
+
+    @Test
+    fun `a session remembers how its latest reading was captured`() {
+        val mic = MicSetup(AudioSourceKind.VOICE_RECOGNITION, 48_000)
+        assertEquals(mic, Session(aRoom()).withMic(mic).mic)
+        assertFailsWith<IllegalArgumentException> { MicSetup(AudioSourceKind.UNPROCESSED, 0) }
     }
 }

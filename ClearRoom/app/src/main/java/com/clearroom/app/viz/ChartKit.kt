@@ -10,6 +10,7 @@ import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ceil
@@ -90,6 +91,15 @@ class ChartStyle(val axis: Color, val grid: Color, val label: TextStyle, val emp
                 muted = scheme.outline,
             )
         }
+
+        /** The PDF report (FR-12): dark on white whatever the app's theme, small enough for a page. */
+        fun print(): ChartStyle = ChartStyle(
+            axis = Color(0xFF45464F),
+            grid = Color(0xFFD5D5DC),
+            label = TextStyle(color = Color(0xFF45464F), fontSize = 7.sp),
+            emphasis = Color(0xFF3B5BA9),
+            muted = Color(0xFF8A8C96),
+        )
     }
 }
 

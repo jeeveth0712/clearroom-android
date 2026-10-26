@@ -3,11 +3,14 @@ package com.clearroom.app.ui.screens
 import androidx.annotation.StringRes
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.doubleClick
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -23,14 +26,19 @@ import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.acoustics.StiBand
+import com.clearroom.app.data.RtTake
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.Session
 import com.clearroom.app.ui.Evaluation
+import com.clearroom.app.ui.ReportState
+import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.theme.ClearRoomTheme
 import com.clearroom.app.viz.BAND_NAMES
 import com.clearroom.app.viz.causeCounts
 import com.clearroom.app.viz.decimals
 import com.clearroom.app.viz.easySeatCount
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,8 +54,10 @@ class ResultsScreenTest {
 
     private fun text(@StringRes id: Int, vararg args: Any) = context.getString(id, *args)
 
-    private fun show(session: Session?, evaluation: Evaluation?) = compose.setContent {
-        ClearRoomTheme { ResultsScreen(session, evaluation) }
+    private val events = mutableListOf<UiEvent>()
+
+    private fun show(session: Session?, evaluation: Evaluation?, report: ReportState = ReportState.Idle) = compose.setContent {
+        ClearRoomTheme { ResultsScreen(session, evaluation, report, onEvent = { events += it }) }
     }
 
     private fun showEvaluated(session: Session) = show(session, Evaluation.of(session))
@@ -226,5 +236,100 @@ class ResultsScreenTest {
         compose.onNodeWithText(text(R.string.results_decay_title)).performScrollTo()
         val explanations = compose.onAllNodes(hasText(text(R.string.results_decay_empty))).fetchSemanticsNodes()
         check(explanations.size == 2) { "the decay chart and the waterfall should both explain, found ${explanations.size}" }
+    }
+
+    // --- Report (FR-12) -------------------------------------------------------------------------------
+
+    private fun button(@StringRes label: Int) = compose.onNode(hasText(text(label)) and hasClickAction() and !hasAnyAncestor(isDialog()))
+
+    @Test
+    fun theShareButton_asksForTheReport() {
+        showEvaluated(sample)
+        button(R.string.results_share).performScrollTo().performClick()
+        assertEquals(listOf(UiEvent.ShareReport), events)
+    }
+
+    @Test
+    fun whileTheReportIsMade_theButtonWaitsAndSaysSo() {
+        show(sample, Evaluation.of(sample), ReportState.Writing)
+        button(R.string.results_share).performScrollTo().assertIsNotEnabled()
+        assertShown(text(R.string.results_share_writing))
+    }
+
+    @Test
+    fun aReportThatFailed_saysWhatToCheck() {
+        show(sample, Evaluation.of(sample), ReportState.Failed)
+        assertShown(text(R.string.results_share_failed))
+    }
+
+    // --- Before and after (FR-13) ---------------------------------------------------------------------
+
+    /** The sample's readings in the user's own room, which can be re-measured. */
+    private val mine = sample.copy(room = SampleData.room.copy(id = "mine"))
+
+    /** [session] with every clap ringing 30 % shorter, as if curtains went up. */
+    private fun withShorterEcho(session: Session, from: Session = mine) =
+        session.copy(seats = from.seats.map { seat -> seat.copy(rtTakes = seat.rtTakes.map { take -> RtTake(take.t60S.map { it?.times(0.7) }) }) })
+
+    private fun dialogButton(@StringRes label: Int) = compose.onNode(hasText(text(label)) and hasClickAction() and hasAnyAncestor(isDialog()))
+
+    @Test
+    fun aMeasuredRoom_offersReMeasuring_afterAskingFirst() {
+        showEvaluated(mine)
+        button(R.string.compare_start).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.compare_start_body)).assertIsDisplayed()
+        dialogButton(R.string.compare_cancel).performClick()
+        assertTrue(events.isEmpty())
+        button(R.string.compare_start).performScrollTo().performClick()
+        dialogButton(R.string.compare_start_confirm).performClick()
+        assertEquals(listOf(UiEvent.StartRemeasuring), events)
+    }
+
+    @Test
+    fun theSampleRoom_isNotOfferedForReMeasuring() {
+        showEvaluated(sample)
+        compose.onNodeWithText(text(R.string.compare_offer_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun whileReMeasuring_beforeStaysInView_andSaysWhatToMeasure() {
+        showEvaluated(mine.startRemeasuring(1_800_000_000_000L))
+        assertShown(text(R.string.results_needs_more))
+        assertShown(text(R.string.compare_measure_again))
+        assertShown(text(R.string.compare_echo_before))
+        compose.onNodeWithText(text(R.string.compare_echo_after)).assertDoesNotExist()
+    }
+
+    @Test
+    fun afterReMeasuring_beforeAndAfterAreComparedOnOneScale() {
+        val after = withShorterEcho(mine.startRemeasuring(1_800_000_000_000L))
+        showEvaluated(after)
+        val was = (ClarityModel.evaluate(mine) as ClarityResult.Ready).room.let { rowVerdict(it, it.rows - 1) }
+        val now = (ClarityModel.evaluate(after) as ClarityResult.Ready).room.let { rowVerdict(it, it.rows - 1) }
+        assertShown(text(R.string.fixes_summary_back, text(was.band.phraseRes()), text(now.band.phraseRes())))
+        assertShown(text(R.string.compare_before_line, rangeText(context.resources, was.band, was.lowSti, was.highSti)))
+        assertShown(text(R.string.compare_after_line, rangeText(context.resources, now.band, now.lowSti, now.highSti)))
+        assertShown(text(R.string.compare_echo_after))
+        assertShown(text(R.string.compare_caption))
+        compose.onNodeWithText(text(R.string.compare_offer_title)).assertDoesNotExist()
+    }
+
+    @Test
+    fun stoppingTheComparison_asksFirst_andSaysTheEarlierReadingsComeBack() {
+        showEvaluated(mine.startRemeasuring(1L)) // nothing new measured yet
+        button(R.string.compare_stop).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.compare_stop_body_restore)).assertIsDisplayed()
+        dialogButton(R.string.compare_keep).performClick()
+        assertTrue(events.isEmpty())
+        button(R.string.compare_stop).performScrollTo().performClick()
+        dialogButton(R.string.compare_stop).performClick()
+        assertEquals(listOf(UiEvent.StopComparing), events)
+    }
+
+    @Test
+    fun stoppingAfterNewReadings_saysBeforeIsDropped() {
+        showEvaluated(withShorterEcho(mine.startRemeasuring(1L)))
+        button(R.string.compare_stop).performScrollTo().performClick()
+        compose.onNodeWithText(text(R.string.compare_stop_body_new)).assertIsDisplayed()
     }
 }
