@@ -86,25 +86,48 @@
     <string name="mic_allow">Allow microphone</string>
     <string name="mic_open_settings">Open settings</string>
 
-    <!-- Microphone test (M2): proves the recorder before clap tests arrive -->
-    <string name="recorder_title">Test the microphone</string>
-    <string name="recorder_idle_hint">Records 5 seconds after a short countdown. Talk or clap to see the level bar move.</string>
-    <string name="recorder_start">Start test recording</string>
-    <string name="recorder_again">Record again</string>
-    <string name="recorder_cancel">Cancel</string>
-    <string name="recorder_countdown">Starting in %1$d…</string>
-    <string name="recorder_recording">Recording for %1$.0f seconds…</string>
-    <string name="recorder_level_label">Sound level</string>
-    <plurals name="recorder_summary">
-        <item quantity="one">Recorded %1$.1f s at %2$d sample per second, using the %3$s.</item>
-        <item quantity="other">Recorded %1$.1f s at %2$d samples per second, using the %3$s.</item>
-    </plurals>
-    <string name="recorder_loudness">Loudest moment %1$.0f dB, average %2$.0f dB (relative to the phone\'s maximum).</string>
-    <string name="source_unprocessed">raw microphone (best for measuring)</string>
-    <string name="source_voice_recognition">speech microphone (no automatic volume)</string>
-    <string name="quality_ok">The recording looks clean.</string>
-    <string name="quality_clipped">Too loud: the sound overloaded the microphone. Clap softer or step back.</string>
+    <!-- Measure tab: status -->
+    <string name="measure_no_room">Set up or open a room on the Room tab first. Then pick the seat where the phone is.</string>
+    <string name="measure_sample_room">The sample room is for exploring. Save it as your own room on the Room tab, then measure here.</string>
+    <string name="measure_level_label">Sound level</string>
+    <string name="measure_ready">Ready. Pick a seat, then choose a measurement below.</string>
+    <string name="measure_countdown">Starting in %1$d…</string>
+    <string name="measure_recording_noise">Listening to the background noise for %1$.0f seconds. Please keep quiet…</string>
+    <string name="measure_recording_voice">Recording the voice for %1$.0f seconds. Keep reading…</string>
+    <string name="measure_cancel">Cancel</string>
+    <string name="measure_saved_noise">Saved the noise for %1$s.</string>
+    <string name="measure_saved_voice">Saved the voice reference.</string>
+    <string name="measure_save_failed">Measured, but the room couldn\'t be saved. Check the phone has free storage, then try again.</string>
+    <string name="quality_clipped">Too loud: the sound overloaded the microphone. Move the phone a little further away and try again.</string>
     <string name="quality_silent">No sound came through. Another app may be using the microphone, or it\'s muted.</string>
+
+    <!-- Measure tab: seat picker -->
+    <string name="measure_seat_title">Where is the phone?</string>
+    <string name="measure_seat_hint">Tap the seat where the phone is. The front of the room, with the speaker, is at the top.</string>
+    <string name="measure_seat_none">No seat picked yet.</string>
+    <string name="seat_label">Row %1$d, seat %2$d</string>
+    <string name="seat_measured">noise measured</string>
+
+    <!-- Measure tab: background noise (FR-4) -->
+    <string name="measure_noise_title">Background noise</string>
+    <string name="measure_noise_hint">Leave fans and AC as they usually are and say how they\'re set. Everyone keeps quiet while the phone listens.</string>
+    <string name="measure_fans_label">Fans or AC right now</string>
+    <string name="fans_off">Off</string>
+    <string name="fans_slow">Slow</string>
+    <string name="fans_fast">Fast</string>
+    <string name="measure_noise_start">Measure noise here (%1$.0f s)</string>
+    <string name="measure_noise_result">Noise at this seat (fans: %1$s)</string>
+
+    <!-- Measure tab: voice reference (FR-5) -->
+    <string name="measure_voice_title">Speaker\'s voice</string>
+    <string name="measure_voice_hint">Hold the phone 1 m from the speaker\'s mouth, at mouth height. The speaker reads this aloud in their normal teaching voice:</string>
+    <string name="measure_voice_paragraph">Good morning, everyone. Today we will look at how sound travels in this room. Please listen carefully, and raise your hand if any word is hard to hear. When we speak to a class, our voice has to reach the back row as clearly as the front. Let us find out how well it does.</string>
+    <string name="measure_voice_start">Record voice (%1$.0f s)</string>
+    <string name="measure_voice_result">Voice at 1 m:</string>
+
+    <!-- Band levels table -->
+    <string name="levels_caption">dB relative to the phone\'s maximum. Only differences between readings matter.</string>
+    <string name="levels_overall">Overall: %1$.0f dB (A-weighted)</string>
     <string name="problem_mic_unavailable">Couldn\'t open the microphone. Close other apps that use it, then try again.</string>
     <string name="problem_permission_revoked">Microphone access was turned off. Allow it again to measure.</string>
     <string name="problem_read_failed">The recording stopped unexpectedly. Please try again.</string>

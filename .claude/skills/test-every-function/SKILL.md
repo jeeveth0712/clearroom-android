@@ -14,7 +14,7 @@ This skill is the per-change workflow. For *what the right answers are* (golden 
 1. **List what changed:** every new or modified public or internal function, class and module.
 2. **Pick the test type** for each from the layer table below.
 3. **Write the cases** from the six-question checklist. One test function checks one behaviour.
-4. **Run them:** `gradlew.bat testDebugUnitTest` (JVM). Run `gradlew.bat connectedDebugAndroidTest` (on the S24 Ultra) only for device tests.
+4. **Run them:** `gradlew.bat test` (JVM). Run `gradlew.bat connectedAndroidTest` (on the S24 Ultra) only for device tests.
 5. **Find gaps:** `python -I .claude/skills/test-every-function/scripts/find_untested.py --main ClearRoom/app/src/main --tests ClearRoom/app/src/test ClearRoom/app/src/androidTest`. It lists functions, classes and composables that no test mentions. Either test each one, or state why not (for example "trivial getter, covered through `ClarityEngine` tests").
 6. **Report** with the template at the end. If the project doesn't build yet, write the tests anyway and say clearly that they haven't been run.
 
@@ -135,7 +135,7 @@ After writing tests, finish with:
 | --- | --- | --- |
 | dsp/Sti.kt · sti() | StiTest.kt | known answers (5 golden), band edges, NaN rejected, monotonic in T60 and SNR |
 
-**Run:** 42 passed, 0 failed (testDebugUnitTest, 11 s) · device tests: not run (no phone connected)
+**Run:** 42 passed, 0 failed (test, 11 s) · device tests: not run (no phone connected)
 **Untested by design:** Theme.kt (colours only)
 **find_untested.py:** 0 functions, 0 classes, 1 composable (AppScaffold: covered by the tab-switch UI test once on device)
 ```

@@ -22,17 +22,21 @@ fun rmsDbFs(samples: FloatArray, from: Int = 0, count: Int = samples.size - from
         val x = samples[i].toDouble()
         sumOfSquares += x * x
     }
-    return meanSquareToDb(sumOfSquares / count)
+    return meanSquareDb(sumOfSquares / count)
 }
 
 /** Largest absolute sample in dBFS. */
 fun peakDbFs(samples: FloatArray): Double {
     var peak = 0.0
     for (x in samples) peak = max(peak, abs(x.toDouble()))
-    return meanSquareToDb(peak * peak)
+    return meanSquareDb(peak * peak)
 }
 
-private fun meanSquareToDb(meanSquare: Double): Double =
+/**
+ * A mean-square (energy) value as dB, never below [SILENCE_DB] and never -Infinity.
+ * NaN stays NaN on purpose: it means a bug upstream, and BandLevels refuses it loudly.
+ */
+fun meanSquareDb(meanSquare: Double): Double =
     if (meanSquare <= 0.0) SILENCE_DB else max(SILENCE_DB, 10 * log10(meanSquare))
 
 /**

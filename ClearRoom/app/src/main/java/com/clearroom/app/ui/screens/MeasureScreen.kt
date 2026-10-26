@@ -5,27 +5,34 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
-import com.clearroom.app.audio.AudioSourceKind
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
-import com.clearroom.app.audio.RecordingSummary
+import com.clearroom.app.data.FanState
+import com.clearroom.app.data.SampleData
+import com.clearroom.app.data.SeatId
+import com.clearroom.app.data.Session
+import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.permission.MicAccess
 import com.clearroom.app.permission.rememberMicPermission
 import com.clearroom.app.ui.AppTab
@@ -34,9 +41,10 @@ import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.theme.ClearRoomTheme
 
-/** Measure tab: microphone access first, then the microphone test (clap tests arrive in M5). */
+/** Measure tab: microphone access, then where the phone is and what to measure there. */
 @Composable
 fun MeasureScreen(
+    session: Session?,
     measure: MeasureUiState,
     liveLevelDb: () -> Double,
     onEvent: (UiEvent) -> Unit,
@@ -45,6 +53,7 @@ fun MeasureScreen(
     val mic = rememberMicPermission()
     MeasureContent(
         micAccess = mic.access,
+        session = session,
         measure = measure,
         liveLevelDb = liveLevelDb,
         onAllowMic = mic.request,
@@ -57,6 +66,7 @@ fun MeasureScreen(
 @Composable
 fun MeasureContent(
     micAccess: MicAccess,
+    session: Session?,
     measure: MeasureUiState,
     liveLevelDb: () -> Double,
     onAllowMic: () -> Unit,
@@ -65,79 +75,117 @@ fun MeasureContent(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().padding(16.dp),
+        modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(stringResource(AppTab.MEASURE.labelRes), style = MaterialTheme.typography.headlineSmall)
         Text(stringResource(R.string.measure_intro), style = MaterialTheme.typography.bodyLarge)
         when (micAccess) {
-            MicAccess.GRANTED -> RecorderCard(measure.phase, liveLevelDb, onEvent)
             MicAccess.NOT_ASKED -> MicAccessCard(R.string.mic_why, R.string.mic_allow, onAllowMic)
             MicAccess.DENIED_CAN_ASK_AGAIN -> MicAccessCard(R.string.mic_denied_can_ask_again, R.string.mic_allow, onAllowMic)
             MicAccess.DENIED_PERMANENTLY ->
                 MicAccessCard(R.string.mic_denied_permanently, R.string.mic_open_settings, onOpenSettings)
+            MicAccess.GRANTED -> when {
+                session == null -> InfoCard { BodyText(R.string.measure_no_room) }
+                session.room.id == SampleData.ROOM_ID -> InfoCard { BodyText(R.string.measure_sample_room) }
+                else -> Measurements(session, measure, liveLevelDb, onEvent)
+            }
         }
+    }
+}
+
+@Composable
+private fun Measurements(session: Session, measure: MeasureUiState, liveLevelDb: () -> Double, onEvent: (UiEvent) -> Unit) {
+    val busy = measure.phase.isBusy
+    StatusCard(measure.phase, liveLevelDb, onCancel = { onEvent(UiEvent.CancelRecording) })
+
+    InfoCard {
+        Text(stringResource(R.string.measure_seat_title), style = MaterialTheme.typography.titleMedium)
+        BodyText(R.string.measure_seat_hint)
+        SeatPicker(
+            rows = session.room.rows,
+            cols = session.room.cols,
+            measured = session.seats.filter { it.noise != null }.map { it.seat }.toSet(),
+            selected = measure.selectedSeat,
+            onSelect = { onEvent(UiEvent.SelectSeat(it)) },
+        )
+        Text(
+            measure.selectedSeat?.let { seatLabel(it) } ?: stringResource(R.string.measure_seat_none),
+            style = MaterialTheme.typography.titleSmall,
+        )
+    }
+
+    InfoCard {
+        Text(stringResource(R.string.measure_noise_title), style = MaterialTheme.typography.titleMedium)
+        BodyText(R.string.measure_noise_hint)
+        Text(stringResource(R.string.measure_fans_label), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FanState.entries.forEach { fans ->
+                FilterChip(
+                    selected = fans == measure.fans,
+                    onClick = { onEvent(UiEvent.SetFans(fans)) },
+                    label = { Text(stringResource(fans.labelRes())) },
+                )
+            }
+        }
+        Button(
+            onClick = { onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE)) },
+            enabled = measure.selectedSeat != null && !busy,
+        ) { Text(stringResource(R.string.measure_noise_start, MeasureKind.NOISE.durationS)) }
+        val seatMeasure = measure.selectedSeat?.let(session::measureAt)
+        val noise = seatMeasure?.noise
+        if (noise != null) {
+            val fans = seatMeasure.fans?.let { stringResource(it.labelRes()) } ?: "?"
+            Text(stringResource(R.string.measure_noise_result, fans), style = MaterialTheme.typography.titleSmall)
+            BandLevelsTable(noise)
+        }
+    }
+
+    InfoCard {
+        Text(stringResource(R.string.measure_voice_title), style = MaterialTheme.typography.titleMedium)
+        BodyText(R.string.measure_voice_hint)
+        Text(stringResource(R.string.measure_voice_paragraph), style = MaterialTheme.typography.bodyLarge, fontStyle = FontStyle.Italic)
+        Button(onClick = { onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE)) }, enabled = !busy) {
+            Text(stringResource(R.string.measure_voice_start, MeasureKind.VOICE.durationS))
+        }
+        session.voice?.let { voice ->
+            Text(stringResource(R.string.measure_voice_result), style = MaterialTheme.typography.titleSmall)
+            BandLevelsTable(voice)
+        }
+    }
+}
+
+@Composable
+private fun StatusCard(phase: MeasurePhase, liveLevelDb: () -> Double, onCancel: () -> Unit) {
+    InfoCard {
+        Text(stringResource(R.string.measure_level_label), style = MaterialTheme.typography.labelMedium)
+        LevelBar(liveLevelDb)
+        val status = when (phase) {
+            MeasurePhase.Idle -> stringResource(R.string.measure_ready)
+            is MeasurePhase.Countdown -> stringResource(R.string.measure_countdown, phase.secondsLeft)
+            is MeasurePhase.Recording -> when (phase.kind) {
+                MeasureKind.NOISE -> stringResource(R.string.measure_recording_noise, phase.kind.durationS)
+                MeasureKind.VOICE -> stringResource(R.string.measure_recording_voice, phase.kind.durationS)
+            }
+            is MeasurePhase.Saved -> when (phase.kind) {
+                MeasureKind.NOISE -> stringResource(R.string.measure_saved_noise, phase.seat?.let { seatLabel(it) }.orEmpty())
+                MeasureKind.VOICE -> stringResource(R.string.measure_saved_voice)
+            }
+            is MeasurePhase.Rejected -> stringResource(phase.quality.messageRes())
+            is MeasurePhase.Failed -> stringResource(phase.problem.messageRes())
+            MeasurePhase.SaveFailed -> stringResource(R.string.measure_save_failed)
+        }
+        Text(status, style = MaterialTheme.typography.bodyLarge)
+        if (phase.isBusy) OutlinedButton(onClick = onCancel) { Text(stringResource(R.string.measure_cancel)) }
     }
 }
 
 @Composable
 private fun MicAccessCard(@StringRes message: Int, @StringRes action: Int, onAction: () -> Unit) {
     InfoCard {
-        Text(stringResource(message), style = MaterialTheme.typography.bodyMedium)
+        BodyText(message)
         Button(onClick = onAction) { Text(stringResource(action)) }
     }
-}
-
-@Composable
-private fun RecorderCard(phase: MeasurePhase, liveLevelDb: () -> Double, onEvent: (UiEvent) -> Unit) {
-    val start = { onEvent(UiEvent.StartTestRecording) }
-    val cancel = { onEvent(UiEvent.CancelRecording) }
-    InfoCard {
-        Text(stringResource(R.string.recorder_title), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.recorder_level_label), style = MaterialTheme.typography.labelMedium)
-        LevelBar(liveLevelDb)
-        when (phase) {
-            MeasurePhase.Idle -> {
-                Text(stringResource(R.string.recorder_idle_hint), style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = start) { Text(stringResource(R.string.recorder_start)) }
-            }
-            is MeasurePhase.Countdown -> {
-                Text(stringResource(R.string.recorder_countdown, phase.secondsLeft), style = MaterialTheme.typography.bodyLarge)
-                OutlinedButton(onClick = cancel) { Text(stringResource(R.string.recorder_cancel)) }
-            }
-            is MeasurePhase.Recording -> {
-                Text(stringResource(R.string.recorder_recording, phase.durationS), style = MaterialTheme.typography.bodyLarge)
-                OutlinedButton(onClick = cancel) { Text(stringResource(R.string.recorder_cancel)) }
-            }
-            is MeasurePhase.Done -> {
-                SummaryText(phase.summary)
-                Button(onClick = start) { Text(stringResource(R.string.recorder_again)) }
-            }
-            is MeasurePhase.Failed -> {
-                Text(stringResource(phase.problem.messageRes()), style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = start) { Text(stringResource(R.string.recorder_again)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SummaryText(summary: RecordingSummary) {
-    Text(stringResource(summary.quality.messageRes()), style = MaterialTheme.typography.bodyLarge)
-    Text(
-        pluralStringResource(
-            R.plurals.recorder_summary,
-            summary.sampleRate,
-            summary.durationS,
-            summary.sampleRate,
-            stringResource(summary.source.nameRes()),
-        ),
-        style = MaterialTheme.typography.bodyMedium,
-    )
-    Text(
-        stringResource(R.string.recorder_loudness, summary.peakDbFs, summary.averageDbFs),
-        style = MaterialTheme.typography.bodyMedium,
-    )
 }
 
 @Composable
@@ -147,11 +195,25 @@ private fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
     }
 }
 
+@Composable
+private fun BodyText(@StringRes text: Int) = Text(stringResource(text), style = MaterialTheme.typography.bodyMedium)
+
+/** People count rows and seats from 1, the front row being row 1. */
+@Composable
+private fun seatLabel(seat: SeatId): String = stringResource(R.string.seat_label, seat.row + 1, seat.col + 1)
+
+@StringRes
+private fun FanState.labelRes(): Int = when (this) {
+    FanState.OFF -> R.string.fans_off
+    FanState.SLOW -> R.string.fans_slow
+    FanState.FAST -> R.string.fans_fast
+}
+
 @StringRes
 private fun ClipQuality.messageRes(): Int = when (this) {
-    ClipQuality.OK -> R.string.quality_ok
     ClipQuality.CLIPPED -> R.string.quality_clipped
-    ClipQuality.SILENT -> R.string.quality_silent
+    // A measurement is never rejected as OK; listed so the `when` stays exhaustive.
+    ClipQuality.SILENT, ClipQuality.OK -> R.string.quality_silent
 }
 
 @StringRes
@@ -161,33 +223,23 @@ private fun CaptureProblem.messageRes(): Int = when (this) {
     CaptureProblem.READ_FAILED -> R.string.problem_read_failed
 }
 
-@StringRes
-private fun AudioSourceKind.nameRes(): Int = when (this) {
-    AudioSourceKind.UNPROCESSED -> R.string.source_unprocessed
-    AudioSourceKind.VOICE_RECOGNITION -> R.string.source_voice_recognition
-}
-
-private class MeasurePreviews : PreviewParameterProvider<Pair<MicAccess, MeasurePhase>> {
+private class MeasurePreviews : PreviewParameterProvider<Pair<MicAccess, MeasureUiState>> {
     override val values = sequenceOf(
-        MicAccess.NOT_ASKED to MeasurePhase.Idle,
-        MicAccess.DENIED_PERMANENTLY to MeasurePhase.Idle,
-        MicAccess.GRANTED to MeasurePhase.Idle,
-        MicAccess.GRANTED to MeasurePhase.Countdown(secondsLeft = 2),
-        MicAccess.GRANTED to MeasurePhase.Done(
-            RecordingSummary(5.0, 48_000, AudioSourceKind.UNPROCESSED, peakDbFs = -9.0, averageDbFs = -42.0, ClipQuality.OK),
-        ),
-        MicAccess.GRANTED to MeasurePhase.Failed(CaptureProblem.MIC_UNAVAILABLE),
+        MicAccess.NOT_ASKED to MeasureUiState(),
+        MicAccess.GRANTED to MeasureUiState(selectedSeat = SeatId(2, 3), fans = FanState.FAST),
+        MicAccess.GRANTED to MeasureUiState(selectedSeat = SeatId(0, 0), phase = MeasurePhase.Countdown(MeasureKind.NOISE, 2)),
     )
 }
 
-@Preview(showBackground = true)
-@Preview(showBackground = true, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Preview(showBackground = true, heightDp = 1600)
+@Preview(showBackground = true, heightDp = 1600, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun MeasureContentPreview(@PreviewParameter(MeasurePreviews::class) case: Pair<MicAccess, MeasurePhase>) {
+private fun MeasureContentPreview(@PreviewParameter(MeasurePreviews::class) case: Pair<MicAccess, MeasureUiState>) {
     ClearRoomTheme {
         MeasureContent(
             micAccess = case.first,
-            measure = MeasureUiState(phase = case.second),
+            session = SampleData.session.withRoom(SampleData.room.copy(id = "mine")),
+            measure = case.second,
             liveLevelDb = { -40.0 },
             onAllowMic = {},
             onOpenSettings = {},

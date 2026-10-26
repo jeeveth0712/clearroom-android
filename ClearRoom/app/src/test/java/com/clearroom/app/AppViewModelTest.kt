@@ -2,11 +2,16 @@ package com.clearroom.app
 
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
+import com.clearroom.app.data.FanState
 import com.clearroom.app.data.FieldProblem
 import com.clearroom.app.data.RoomField
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SavedRoom
+import com.clearroom.app.data.SeatId
+import com.clearroom.app.data.SeatMeasure
 import com.clearroom.app.data.Session
+import com.clearroom.app.measure.LevelMeasurement
+import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.testing.FakeAudioInput
 import com.clearroom.app.testing.InMemoryRoomRepository
 import com.clearroom.app.testing.MainDispatcherRule
@@ -18,6 +23,7 @@ import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.UiEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -56,94 +62,192 @@ class AppViewModelTest {
         runCurrent()
     }
 
-    // --- Microphone test (M2) -------------------------------------------------------------
+    // --- Measuring noise and voice (M4) ------------------------------------------------------
 
-    @Test
-    fun `starts idle`() {
-        assertEquals(MeasurePhase.Idle, phase)
+    /** Starts the app with saved room "r1" (5 x 6 seats) open, as a user would be before measuring. */
+    private fun TestScope.startWithRoom(vararg seatsMeasured: SeatMeasure): AppViewModel {
+        saveNow(Session(aRoom(id = "r1"), seats = seatsMeasured.toList()))
+        return startApp()
     }
 
-    @Test
-    fun `start counts down 3, 2, 1 a second apart, then records for 5 seconds`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
+    private fun TestScope.saveNow(session: Session) {
+        launch { rooms.save(session) }
         runCurrent()
-        assertEquals(MeasurePhase.Countdown(3), phase)
-        advanceSeconds(1)
-        assertEquals(MeasurePhase.Countdown(2), phase)
-        advanceSeconds(1)
-        assertEquals(MeasurePhase.Countdown(1), phase)
-        advanceSeconds(1)
-        assertEquals(MeasurePhase.Recording(AppViewModel.TEST_RECORDING_S), phase)
-        assertEquals(listOf(AppViewModel.TEST_RECORDING_S), audio.requestedSeconds)
     }
 
-    @Test
-    fun `a finished recording shows its summary`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
-        advanceUntilIdle()
-        val done = assertIs<MeasurePhase.Done>(phase)
-        assertEquals(AppViewModel.TEST_RECORDING_S, done.summary.durationS, absoluteTolerance = 1e-9)
-        assertEquals(FakeAudioInput.SAMPLE_RATE, done.summary.sampleRate)
-        assertEquals(ClipQuality.OK, done.summary.quality)
-    }
+    private fun AppViewModel.phase() = state.value.measure.phase
 
     @Test
-    fun `a clipped recording is a finished recording with a clipped verdict, not a failure`() = runTest {
-        audio.samples = { rate, seconds -> Signals.clipped(run = 10, seconds = seconds, sampleRate = rate) }
-        viewModel.onEvent(UiEvent.StartTestRecording)
-        advanceUntilIdle()
-        assertEquals(ClipQuality.CLIPPED, assertIs<MeasurePhase.Done>(phase).summary.quality)
-    }
-
-    @Test
-    fun `each capture problem ends in a Failed phase naming that problem`() = runTest {
-        CaptureProblem.entries.forEach { problem ->
-            audio.failWith = problem
-            viewModel.onEvent(UiEvent.StartTestRecording)
-            advanceUntilIdle()
-            assertEquals(MeasurePhase.Failed(problem), phase, "problem=$problem")
-        }
-    }
-
-    @Test
-    fun `cancel during the countdown returns to idle without opening the microphone`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
-        advanceSeconds(1)
-        viewModel.onEvent(UiEvent.CancelRecording)
-        advanceUntilIdle()
+    fun `starts idle with no seat picked`() {
         assertEquals(MeasurePhase.Idle, phase)
+        assertNull(viewModel.state.value.measure.selectedSeat)
+    }
+
+    @Test
+    fun `nothing is measured without a saved room or, for noise, a seat`() = runTest {
+        viewModel.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE)) // no room at all
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE)) // room, but no seat picked
+        advanceUntilIdle()
         assertEquals(emptyList(), audio.requestedSeconds)
     }
 
     @Test
-    fun `cancel during recording stops the recording and returns to idle`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
-        advanceSeconds(AppViewModel.COUNTDOWN_S + 1)
-        assertIs<MeasurePhase.Recording>(phase)
-        viewModel.onEvent(UiEvent.CancelRecording)
+    fun `the sample room can't be measured into`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
         advanceUntilIdle()
-        assertEquals(MeasurePhase.Idle, phase)
-        assertEquals(1, audio.cancelledRecordings)
+        assertEquals(emptyList(), audio.requestedSeconds)
     }
 
     @Test
-    fun `pressing start again while busy does not start a second recording`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
+    fun `noise at a seat counts down, listens 30 s, then saves the levels and fan state`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(2, 3)))
+        vm.onEvent(UiEvent.SetFans(FanState.FAST))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        runCurrent()
+        assertEquals(MeasurePhase.Countdown(MeasureKind.NOISE, 3), vm.phase())
+        advanceSeconds(LevelMeasurement.COUNTDOWN_S)
+        assertEquals(MeasurePhase.Recording(MeasureKind.NOISE), vm.phase())
+        advanceUntilIdle()
+
+        assertEquals(MeasurePhase.Saved(MeasureKind.NOISE, SeatId(2, 3)), vm.phase())
+        assertEquals(listOf(30.0), audio.requestedSeconds)
+        val stored = assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(2, 3)))
+        assertEquals(FanState.FAST, stored.fans)
+        val noise = assertNotNull(stored.noise).valuesDb
+        assertEquals(3, noise.indices.maxBy { noise[it] }, "the 1 kHz test tone should be loudest: $noise")
+        assertEquals(stored, vm.state.value.session?.measureAt(SeatId(2, 3)))
+    }
+
+    @Test
+    fun `the voice reference needs no seat and is saved for the room`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Saved(MeasureKind.VOICE, null), vm.phase())
+        assertEquals(listOf(20.0), audio.requestedSeconds)
+        assertNotNull(assertNotNull(rooms.load("r1")).voice)
+    }
+
+    @Test
+    fun `measuring a seat again replaces its noise and keeps its echo takes`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceUntilIdle()
+        val seat = assertNotNull(rooms.load("r1")).seats.single()
+        assertNotEquals(aMeasuredSeat(0, 0).noise, seat.noise)
+        assertEquals(aMeasuredSeat(0, 0).rtTakes, seat.rtTakes)
+    }
+
+    @Test
+    fun `a clipped recording is rejected and nothing is saved`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        audio.samples = { rate, seconds -> Signals.clipped(run = 10, seconds = seconds, sampleRate = rate) }
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Rejected(MeasureKind.NOISE, ClipQuality.CLIPPED), vm.phase())
+        assertEquals(emptyList(), assertNotNull(rooms.load("r1")).seats)
+    }
+
+    @Test
+    fun `microphone problems and failed saves are reported`() = runTest {
+        val vm = startWithRoom()
+        audio.failWith = CaptureProblem.MIC_UNAVAILABLE
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Failed(CaptureProblem.MIC_UNAVAILABLE), vm.phase())
+
+        audio.failWith = null
+        rooms.failSaves = true
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.SaveFailed, vm.phase())
+    }
+
+    @Test
+    fun `cancel during the countdown returns to idle without opening the microphone`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
         advanceSeconds(1)
-        viewModel.onEvent(UiEvent.StartTestRecording)
+        vm.onEvent(UiEvent.CancelRecording)
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Idle, vm.phase())
+        assertEquals(emptyList(), audio.requestedSeconds)
+    }
+
+    @Test
+    fun `cancel during recording stops it, returns to idle and saves nothing`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
+        advanceSeconds(LevelMeasurement.COUNTDOWN_S + 1)
+        assertIs<MeasurePhase.Recording>(vm.phase())
+        vm.onEvent(UiEvent.CancelRecording)
+        advanceUntilIdle()
+        assertEquals(MeasurePhase.Idle, vm.phase())
+        assertEquals(1, audio.cancelledRecordings)
+        assertNull(assertNotNull(rooms.load("r1")).voice)
+    }
+
+    @Test
+    fun `starting again while busy doesn't start a second recording, and the seat can't change`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceSeconds(1)
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE))
+        vm.onEvent(UiEvent.SelectSeat(SeatId(4, 5)))
+        assertEquals(SeatId(0, 0), vm.state.value.measure.selectedSeat)
         advanceUntilIdle()
         assertEquals(1, audio.requestedSeconds.size)
     }
 
     @Test
-    fun `recording again after a result starts a fresh countdown`() = runTest {
-        viewModel.onEvent(UiEvent.StartTestRecording)
-        advanceUntilIdle()
-        viewModel.onEvent(UiEvent.StartTestRecording)
+    fun `seats outside the grid can't be picked`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(5, 0)))
+        assertNull(vm.state.value.measure.selectedSeat)
+    }
+
+    @Test
+    fun `the seat choice is kept for the same room but cleared for another room or a smaller grid`() = runTest {
+        saveNow(Session(aRoom(id = "other")))
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SelectSeat(SeatId(4, 0)))
+
+        vm.onEvent(UiEvent.RoomFormChanged(vm.state.value.room.form.copy(name = "Renamed")))
+        vm.onEvent(UiEvent.SaveRoom)
         runCurrent()
-        assertEquals(MeasurePhase.Countdown(AppViewModel.COUNTDOWN_S), phase)
+        assertEquals(SeatId(4, 0), vm.state.value.measure.selectedSeat)
+
+        vm.onEvent(UiEvent.RoomFormChanged(vm.state.value.room.form.copy(rows = "3")))
+        vm.onEvent(UiEvent.SaveRoom)
+        runCurrent()
+        assertNull(vm.state.value.measure.selectedSeat)
+
+        vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
+        vm.onEvent(UiEvent.OpenRoom("other"))
+        runCurrent()
+        assertNull(vm.state.value.measure.selectedSeat)
+    }
+
+    @Test
+    fun `a measurement is saved to the room it was taken in, even if the user switches rooms meanwhile`() = runTest {
+        saveNow(Session(aRoom(id = "other")))
+        val vm = startWithRoom() // "r1" is saved last, so it opens
+        vm.onEvent(UiEvent.SelectSeat(SeatId(1, 1)))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
+        advanceSeconds(LevelMeasurement.COUNTDOWN_S + 1)
+        vm.onEvent(UiEvent.OpenRoom("other"))
         advanceUntilIdle()
-        assertEquals(2, audio.requestedSeconds.size)
+        assertNotNull(assertNotNull(rooms.load("r1")).measureAt(SeatId(1, 1)))
+        assertEquals(emptyList(), assertNotNull(rooms.load("other")).seats)
+        assertEquals("other", vm.state.value.session?.room?.id)
     }
 
     @Test

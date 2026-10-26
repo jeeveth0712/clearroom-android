@@ -205,7 +205,7 @@ You do this once, in Android Studio. It takes about 5 minutes plus the first syn
 ### How each milestone runs
 
 1. **Claude** writes the code for the milestone, following the listed skills, **with tests for every new function in the same change** (the `test-every-function` skill). A milestone isn't done while `find_untested.py` still lists untested functions without a stated reason.
-2. **Claude** runs `gradlew.bat assembleDebug testDebugUnitTest lintDebug` from the terminal and fixes anything that fails. Tests that need the phone (microphone, files, UI) run with `gradlew.bat connectedDebugAndroidTest` at the end of each milestone.
+2. **Claude** runs `gradlew.bat assembleDebug test lintDebug` from the terminal and fixes anything that fails. Tests that need the phone (microphone, files, UI) run with `gradlew.bat connectedAndroidTest` at the end of each milestone. They run in a separate test copy of the app (`com.clearroom.app.uitest`), which is installed and removed by the test run, so **your own ClearRoom and its saved rooms are never touched**.
 3. **You** install it on the phone (press *Run* in Studio, or Claude runs `adb install`), try the "done when" check, and say what you see.
 4. Claude fixes what you report, then makes **one commit** for the milestone. One commit per milestone means any one of them can be rolled back.
 
@@ -230,7 +230,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 - [x] **M3 — Data and Room tab.** Data models, JSON store, room form, seat grid, built-in sample room. *(Done Oct 26: 117 laptop + 40 phone tests pass. Rooms are saved atomically as one JSON file each, named by id; the last saved room reopens on start; a damaged file is listed separately and can be deleted. Surfaces follow FR-1's pick list per floor, walls and ceiling.)*
   *Skills:* storage-and-pdf-report, clearroom-android-foundation.
   *Done when:* a room survives closing and reopening the app, and the sample room loads.
-- [ ] **M4 — Filters and levels.** Biquad filters, 7-band octave bank, noise snapshot, voice reference.
+- [x] **M4 — Filters and levels.** Biquad filters, 7-band octave bank, noise snapshot, voice reference. *(Done Oct 26: 153 laptop + 50 phone tests pass. Measure tab: pick the seat, set the fan state, measure 30 s of noise (FR-4; Part E decision 1) or 20 s of voice at 1 m (FR-5); each reading is saved into the room as 7 band levels plus an approximate A-weighted total. The sample room can't be measured into: save your own copy first. Phone tests now run in a separate test app so they never erase your rooms.)*
   *Skills:* acoustics-dsp.
   *Done when:* the noise and voice measurements each show 7 band numbers.
 - [ ] **M5 — Echo analysis.** RT60 per band from a clap, Schroeder curve, quality messages ("clap louder", "too noisy", "clipped"), 3 takes per seat.

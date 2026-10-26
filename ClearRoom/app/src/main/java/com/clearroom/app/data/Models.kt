@@ -56,6 +56,13 @@ data class Room(
 /** FR-4: fans or AC state while the noise was measured. */
 enum class FanState { OFF, SLOW, FAST }
 
+/** A seat's place in the grid; row 0 is the front row. */
+data class SeatId(val row: Int, val col: Int) {
+    init {
+        require(row >= 0 && col >= 0) { "seat position can't be negative: ($row, $col)" }
+    }
+}
+
 /** One clap's RT60 per octave band, in seconds; null where that band's fit was rejected. */
 data class RtTake(val t60S: List<Double?>) {
     init {
@@ -75,6 +82,8 @@ data class SeatMeasure(
     init {
         require(row >= 0 && col >= 0) { "seat position can't be negative: ($row, $col)" }
     }
+
+    val seat: SeatId get() = SeatId(row, col)
 }
 
 /** A room plus its measurements. Audio is never part of it (NFR-6). */
@@ -91,6 +100,20 @@ data class Session(
     /** The same session for an edited room, dropping measurements of seats that no longer exist. */
     fun withRoom(newRoom: Room): Session =
         copy(room = newRoom, seats = seats.filter { it.row < newRoom.rows && it.col < newRoom.cols })
+
+    fun contains(seat: SeatId): Boolean = seat.row < room.rows && seat.col < room.cols
+
+    fun measureAt(seat: SeatId): SeatMeasure? = seats.firstOrNull { it.seat == seat }
+
+    /** FR-4: records (or replaces) the noise snapshot at [seat], keeping that seat's echo takes. */
+    fun withNoise(seat: SeatId, noise: BandLevels, fans: FanState): Session {
+        require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
+        val updated = (measureAt(seat) ?: SeatMeasure(seat.row, seat.col)).copy(noise = noise, fans = fans)
+        return copy(seats = (seats.filterNot { it.seat == seat } + updated).sortedWith(compareBy({ it.row }, { it.col })))
+    }
+
+    /** FR-5: records (or replaces) the speaker's voice reference at 1 m. */
+    fun withVoice(voice: BandLevels): Session = copy(voice = voice)
 }
 
 /** What the saved-rooms list shows, without loading every measurement. */

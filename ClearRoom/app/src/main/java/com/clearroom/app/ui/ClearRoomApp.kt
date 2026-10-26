@@ -41,7 +41,7 @@ fun ClearRoomApp(
         val contentModifier = Modifier.padding(innerPadding)
         when (selectedTab) {
             AppTab.ROOM -> RoomScreen(state.room, onEvent, contentModifier)
-            AppTab.MEASURE -> MeasureScreen(state.measure, liveLevelDb, onEvent, contentModifier)
+            AppTab.MEASURE -> MeasureScreen(state.session, state.measure, liveLevelDb, onEvent, contentModifier)
             AppTab.RESULTS -> TabIntro(AppTab.RESULTS.labelRes, R.string.results_intro, contentModifier)
             AppTab.FIXES -> TabIntro(AppTab.FIXES.labelRes, R.string.fixes_intro, contentModifier)
             AppTab.LOG -> TabIntro(AppTab.LOG.labelRes, R.string.log_intro, contentModifier)

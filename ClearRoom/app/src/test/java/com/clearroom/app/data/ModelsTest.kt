@@ -78,6 +78,50 @@ class ModelsTest {
     }
 
     @Test
+    fun `seat ids can't be negative and a session knows which seats exist`() {
+        assertFailsWith<IllegalArgumentException> { SeatId(-1, 0) }
+        val session = Session(aRoom(rows = 2, cols = 3))
+        assertEquals(true, session.contains(SeatId(1, 2)))
+        assertEquals(false, session.contains(SeatId(2, 0)))
+        assertEquals(false, session.contains(SeatId(0, 3)))
+    }
+
+    @Test
+    fun `recording noise at a new seat adds it, in front-to-back order`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(3, 0)))
+        val updated = session.withNoise(SeatId(1, 2), flatBands(-55.0), FanState.SLOW)
+        assertEquals(listOf(SeatId(1, 2), SeatId(3, 0)), updated.seats.map { it.seat })
+        assertEquals(flatBands(-55.0), updated.measureAt(SeatId(1, 2))?.noise)
+        assertEquals(FanState.SLOW, updated.measureAt(SeatId(1, 2))?.fans)
+    }
+
+    @Test
+    fun `re-recording noise at a seat replaces it and keeps that seat's echo takes`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 0)))
+        val updated = session.withNoise(SeatId(0, 0), flatBands(-70.0), FanState.OFF)
+        val seat = updated.seats.single()
+        assertEquals(flatBands(-70.0), seat.noise)
+        assertEquals(FanState.OFF, seat.fans)
+        assertEquals(aMeasuredSeat(0, 0).rtTakes, seat.rtTakes)
+    }
+
+    @Test
+    fun `noise can't be recorded at a seat outside the grid`() {
+        assertFailsWith<IllegalArgumentException> {
+            Session(aRoom(rows = 2, cols = 2)).withNoise(SeatId(5, 5), flatBands(-60.0), FanState.OFF)
+        }
+    }
+
+    @Test
+    fun `the voice reference is set or replaced without touching seats`() {
+        val session = Session(aRoom(), voice = flatBands(-40.0), seats = listOf(aMeasuredSeat(0, 0)))
+        val updated = session.withVoice(flatBands(-30.0))
+        assertEquals(flatBands(-30.0), updated.voice)
+        assertEquals(session.seats, updated.seats)
+        assertEquals(null, session.measureAt(SeatId(4, 4)))
+    }
+
+    @Test
     fun `saved-room entries expose their id whether readable or damaged`() {
         val summary = RoomSummary("a", "A", 9.0, 7.0, 30, 0, savedAtMillis = 1)
         assertEquals("a", SavedRoom.Readable(summary).id)

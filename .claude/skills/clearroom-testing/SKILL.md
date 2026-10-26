@@ -11,7 +11,7 @@ The app can't use a reference meter (NFR-0), so correctness rests on three thing
 
 ## Running tests
 
-- `gradlew.bat testDebugUnitTest` (Windows) or `./gradlew testDebugUnitTest`. These are JVM tests for `dsp/`, `acoustics/`, `data/Models.kt`, the 3D maths and the axis helper.
+- `gradlew.bat test` (Windows) or `./gradlew test`. These are JVM tests for `dsp/`, `acoustics/`, `data/Models.kt`, the 3D maths and the axis helper.
 - Command-line Gradle on this machine needs `JAVA_HOME` pointed at Android Studio's JBR (the `java` on PATH is 1.8).
 - Coroutines: `kotlinx-coroutines-test` with `runTest`. Inject dispatchers (`AppViewModel(dsp = StandardTestDispatcher(testScheduler))`). Never call `Thread.sleep` in tests.
 - JSON tests need `testImplementation("org.json:json:<latest>")` (see `storage-and-pdf-report`).

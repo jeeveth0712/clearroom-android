@@ -58,6 +58,15 @@ class LevelsTest {
     }
 
     @Test
+    fun `energy converts to dB, with silence for zero and NaN left visible`() {
+        assertEquals(0.0, meanSquareDb(1.0), absoluteTolerance = 1e-12)
+        assertEquals(-20.0, meanSquareDb(0.01), absoluteTolerance = 1e-9)
+        assertEquals(SILENCE_DB, meanSquareDb(0.0))
+        assertEquals(SILENCE_DB, meanSquareDb(-1.0))
+        assertEquals(true, meanSquareDb(Double.NaN).isNaN(), "NaN must not be hidden as silence")
+    }
+
+    @Test
     fun `peak of silence is the silence floor`() {
         assertEquals(SILENCE_DB, peakDbFs(FloatArray(100)))
         assertEquals(SILENCE_DB, peakDbFs(FloatArray(0)))

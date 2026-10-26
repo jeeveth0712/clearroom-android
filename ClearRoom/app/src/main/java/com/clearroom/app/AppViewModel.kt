@@ -6,14 +6,17 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.clearroom.app.audio.AudioInput
-import com.clearroom.app.audio.CaptureException
-import com.clearroom.app.audio.RecordingSummary
 import com.clearroom.app.data.RoomForm
 import com.clearroom.app.data.RoomRepository
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SavedRoom
+import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
+import com.clearroom.app.measure.LevelMeasurement
+import com.clearroom.app.measure.MeasureKind
+import com.clearroom.app.measure.MeasureOutcome
 import com.clearroom.app.ui.MeasurePhase
+import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.RoomUiState
 import com.clearroom.app.ui.UiEvent
@@ -21,24 +24,22 @@ import com.clearroom.app.ui.UiState
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
 
 /**
- * The app's single ViewModel (doc decision). It holds state and sequences work; recording is
- * [AudioInput]'s job, storage is [RoomRepository]'s and the numbers are the engine's.
+ * The app's single ViewModel (doc decision). It holds state and sequences work; recording and
+ * analysis are [LevelMeasurement]'s job and storage is [RoomRepository]'s.
  */
 class AppViewModel(
-    private val audio: AudioInput,
+    audio: AudioInput,
     private val rooms: RoomRepository,
-    private val dsp: CoroutineDispatcher = Dispatchers.Default,
+    dsp: CoroutineDispatcher = Dispatchers.Default,
     private val newRoomId: () -> String = { UUID.randomUUID().toString() },
 ) : ViewModel() {
 
@@ -48,7 +49,8 @@ class AppViewModel(
     /** Separate from [state] so 20 level updates a second redraw only the level bar. */
     val liveLevelDb: StateFlow<Double> = audio.liveLevelDb
 
-    private var recording: Job? = null
+    private val levels = LevelMeasurement(audio, dsp)
+    private var measurement: Job? = null
 
     init {
         // Reopen the room the user saved last, so their work survives an app restart.
@@ -62,8 +64,10 @@ class AppViewModel(
 
     fun onEvent(event: UiEvent) {
         when (event) {
-            UiEvent.StartTestRecording -> startTestRecording()
-            UiEvent.CancelRecording -> cancelRecording()
+            is UiEvent.SelectSeat -> selectSeat(event.seat)
+            is UiEvent.SetFans -> updateMeasure { it.copy(fans = event.fans) }
+            is UiEvent.StartMeasurement -> startMeasurement(event.kind)
+            UiEvent.CancelRecording -> cancelMeasurement()
             is UiEvent.RoomFormChanged -> updateRoom { it.copy(form = event.form, problems = emptyMap(), notice = null) }
             UiEvent.SaveRoom -> viewModelScope.launch { saveRoom() }
             UiEvent.NewRoom -> newRoom()
@@ -72,6 +76,78 @@ class AppViewModel(
             is UiEvent.DeleteRoom -> viewModelScope.launch { deleteRoom(event.roomId) }
         }
     }
+
+    // --- Measuring (FR-4, FR-5) --------------------------------------------------------------
+
+    private fun selectSeat(seat: SeatId) {
+        val session = _state.value.session ?: return
+        if (session.contains(seat) && !_state.value.measure.phase.isBusy) {
+            updateMeasure { it.copy(selectedSeat = seat, phase = MeasurePhase.Idle) }
+        }
+    }
+
+    private fun startMeasurement(kind: MeasureKind) {
+        if (measurement?.isActive == true) return
+        val current = _state.value
+        val session = current.session?.takeUnless { it.room.id == SampleData.ROOM_ID } ?: return
+        val seat = current.measure.selectedSeat
+        if (kind == MeasureKind.NOISE && seat == null) return
+        val fans = current.measure.fans
+
+        measurement = viewModelScope.launch {
+            val outcome = levels.run(
+                kind,
+                onCountdown = { setPhase(MeasurePhase.Countdown(kind, it)) },
+                onRecording = { setPhase(MeasurePhase.Recording(kind)) },
+            )
+            setPhase(
+                when (outcome) {
+                    is MeasureOutcome.Rejected -> MeasurePhase.Rejected(kind, outcome.quality)
+                    is MeasureOutcome.Failed -> MeasurePhase.Failed(outcome.problem)
+                    is MeasureOutcome.Measured -> {
+                        val saved = saveMeasurement(session.room.id) { latest ->
+                            when (kind) {
+                                MeasureKind.NOISE -> latest.withNoise(requireNotNull(seat), outcome.levels, fans)
+                                MeasureKind.VOICE -> latest.withVoice(outcome.levels)
+                            }
+                        }
+                        if (saved) MeasurePhase.Saved(kind, seat.takeIf { kind == MeasureKind.NOISE }) else MeasurePhase.SaveFailed
+                    }
+                },
+            )
+        }
+    }
+
+    /**
+     * Applies [change] to the latest version of room [roomId] and stores it. The user may have
+     * edited or switched rooms during a 30-s recording, so the result always goes to the room it
+     * was measured in.
+     */
+    private suspend fun saveMeasurement(roomId: String, change: (Session) -> Session): Boolean {
+        val latest = _state.value.session?.takeIf { it.room.id == roomId } ?: rooms.load(roomId) ?: return false
+        val updated = change(latest)
+        try {
+            rooms.save(updated)
+        } catch (e: IOException) {
+            return false
+        }
+        val saved = rooms.list()
+        _state.update {
+            it.copy(
+                session = if (it.session?.room?.id == roomId) updated else it.session,
+                room = it.room.copy(saved = saved),
+            )
+        }
+        return true
+    }
+
+    private fun cancelMeasurement() {
+        measurement?.cancel()
+        measurement = null
+        setPhase(MeasurePhase.Idle)
+    }
+
+    // --- Rooms (FR-1) ------------------------------------------------------------------------
 
     private suspend fun saveRoom() {
         val current = _state.value
@@ -104,7 +180,7 @@ class AppViewModel(
     }
 
     private fun newRoom() {
-        _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved)) }
+        _state.update { it.copy(session = null, room = RoomUiState(saved = it.room.saved), measure = it.measure.copy(selectedSeat = null)) }
     }
 
     private fun loadSampleRoom() = showSession(SampleData.session, notice = RoomNotice.SAMPLE_LOADED)
@@ -117,9 +193,10 @@ class AppViewModel(
         updateRoom { it.copy(saved = saved, notice = RoomNotice.DELETED) }
     }
 
-    /** Makes [session] the working room and loads it into the form for editing. */
+    /** Makes [session] the working room, loads it into the form, and keeps the seat choice valid. */
     private fun showSession(session: Session, notice: RoomNotice?) {
         _state.update {
+            val sameRoom = it.session?.room?.id == session.room.id
             it.copy(
                 session = session,
                 room = it.room.copy(
@@ -128,36 +205,16 @@ class AppViewModel(
                     problems = emptyMap(),
                     notice = notice,
                 ),
+                // A seat choice carries over only within the same room, and only if the seat still exists.
+                measure = it.measure.copy(selectedSeat = it.measure.selectedSeat?.takeIf { seat -> sameRoom && session.contains(seat) }),
             )
         }
     }
 
-    private fun startTestRecording() {
-        if (recording?.isActive == true) return
-        recording = viewModelScope.launch {
-            for (secondsLeft in COUNTDOWN_S downTo 1) {
-                setPhase(MeasurePhase.Countdown(secondsLeft))
-                delay(1_000)
-            }
-            setPhase(MeasurePhase.Recording(TEST_RECORDING_S))
-            val outcome = try {
-                val capture = audio.record(TEST_RECORDING_S)
-                MeasurePhase.Done(withContext(dsp) { RecordingSummary.of(capture) })
-            } catch (e: CaptureException) {
-                MeasurePhase.Failed(e.problem)
-            }
-            setPhase(outcome)
-        }
-    }
+    private fun setPhase(phase: MeasurePhase) = updateMeasure { it.copy(phase = phase) }
 
-    private fun cancelRecording() {
-        recording?.cancel()
-        recording = null
-        setPhase(MeasurePhase.Idle)
-    }
-
-    private fun setPhase(phase: MeasurePhase) {
-        _state.update { it.copy(measure = it.measure.copy(phase = phase)) }
+    private fun updateMeasure(change: (MeasureUiState) -> MeasureUiState) {
+        _state.update { it.copy(measure = change(it.measure)) }
     }
 
     private fun updateRoom(change: (RoomUiState) -> RoomUiState) {
@@ -165,12 +222,6 @@ class AppViewModel(
     }
 
     companion object {
-        /** Doc "Exact parameters": a 3-s countdown before each recording. */
-        const val COUNTDOWN_S = 3
-
-        /** Doc "Exact parameters": clap recordings are 5 s; the microphone test uses the same length. */
-        const val TEST_RECORDING_S = 5.0
-
         fun factory(container: AppContainer): ViewModelProvider.Factory = viewModelFactory {
             initializer { AppViewModel(container.audioInput, container.roomRepository) }
         }
