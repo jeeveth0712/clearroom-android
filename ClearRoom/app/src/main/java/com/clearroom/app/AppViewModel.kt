@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.clearroom.app.acoustics.ClarityModel
-import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
@@ -24,6 +23,7 @@ import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasureOutcome
 import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.measure.bandLevelsOf
+import com.clearroom.app.ui.Evaluation
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.RoomNotice
@@ -68,10 +68,10 @@ class AppViewModel(
      * The clarity engine's verdict for the working room (FR-6, FR-7), recomputed off the main
      * thread whenever its measurements change; null while no room is open.
      */
-    val clarity: StateFlow<ClarityResult?> = state
+    val clarity: StateFlow<Evaluation?> = state
         .map { it.session }
         .distinctUntilChanged()
-        .map { session -> session?.let { ClarityModel.evaluate(it) } }
+        .map { session -> session?.let { Evaluation(it, ClarityModel.evaluate(it)) } }
         .flowOn(dsp)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 

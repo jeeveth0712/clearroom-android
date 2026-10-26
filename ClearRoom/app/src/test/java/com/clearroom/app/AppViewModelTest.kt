@@ -361,7 +361,7 @@ class AppViewModelTest {
         val vm = startApp()
         vm.onEvent(UiEvent.LoadSampleRoom)
         runCurrent()
-        val room = assertIs<ClarityResult.Ready>(vm.clarity.value).room
+        val room = assertIs<ClarityResult.Ready>(vm.clarity.value?.result).room
         assertTrue(room.backRowSti < room.frontRowSti, "front ${room.frontRowSti}, back ${room.backRowSti}")
     }
 
@@ -369,7 +369,7 @@ class AppViewModelTest {
     fun `a room still missing measurements says which`() = runTest {
         val vm = startWithRoom(SeatMeasure(0, 0, rtTakes = listOf(RtTake(List(7) { 1.0 }))))
         runCurrent()
-        assertEquals(ClarityResult.NeedsMore(setOf(MissingInput.NOISE)), vm.clarity.value)
+        assertEquals(ClarityResult.NeedsMore(setOf(MissingInput.NOISE)), vm.clarity.value?.result)
     }
 
     @Test
@@ -378,7 +378,7 @@ class AppViewModelTest {
         vm.onEvent(UiEvent.SelectSeat(SeatId(0, 0)))
         vm.onEvent(UiEvent.StartMeasurement(MeasureKind.NOISE))
         advanceUntilIdle()
-        assertIs<ClarityResult.Ready>(vm.clarity.value)
+        assertIs<ClarityResult.Ready>(vm.clarity.value?.result)
     }
 
     @Test

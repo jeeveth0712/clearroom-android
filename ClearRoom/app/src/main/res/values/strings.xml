@@ -148,6 +148,21 @@
     <string name="measure_voice_start">Record voice (%1$.0f s)</string>
     <string name="measure_voice_result">Voice at 1 m:</string>
 
+    <!-- Results tab -->
+    <string name="results_no_room">Open or set up a room on the Room tab, then measure it on the Measure tab.</string>
+    <string name="results_needs_more">To see how clearly each seat can hear, measure:</string>
+    <string name="results_missing_echo">• Echo: a clap test at one seat or more</string>
+    <string name="results_missing_noise">• Background noise at one seat or more</string>
+    <string name="results_working">Working out the clarity…</string>
+    <string name="results_3d_title">3D clarity room</string>
+    <string name="results_3d_caption">Each bar is a seat: taller and bluer means clearer. The cone is the speaker. Drag to turn the room, pinch to zoom, double-tap to reset.</string>
+    <string name="results_3d_description">3D view of the room. Front row: %1$s. Back row: %2$s.</string>
+    <string name="results_uncalibrated">No voice reference yet, so a typical voice is assumed (uncalibrated). Record the voice on the Measure tab for your own result.</string>
+    <string name="band_poor">Poor</string>
+    <string name="band_fair">Fair</string>
+    <string name="band_good">Good</string>
+    <string name="band_excellent">Excellent</string>
+
     <!-- Band levels table -->
     <string name="levels_caption">dB relative to the phone\'s maximum. Only differences between readings matter.</string>
     <string name="levels_overall">Overall: %1$.0f dB (A-weighted)</string>

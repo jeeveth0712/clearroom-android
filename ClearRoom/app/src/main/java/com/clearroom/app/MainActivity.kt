@@ -22,9 +22,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             ClearRoomTheme {
                 val state by viewModel.state.collectAsStateWithLifecycle()
+                val evaluation by viewModel.clarity.collectAsStateWithLifecycle()
                 // Not unwrapped here: only the level bar reads it, so level updates don't recompose the app.
                 val liveLevelDb = viewModel.liveLevelDb.collectAsStateWithLifecycle()
-                ClearRoomApp(state = state, liveLevelDb = { liveLevelDb.value }, onEvent = viewModel::onEvent)
+                ClearRoomApp(state = state, evaluation = evaluation, liveLevelDb = { liveLevelDb.value }, onEvent = viewModel::onEvent)
             }
         }
     }

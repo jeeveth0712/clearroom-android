@@ -239,7 +239,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 - [x] **M6 — Clarity engine.** STI, Sabine fit, speech level vs distance, limiting cause, what-if, required voice level. *(Done Oct 26: 254 laptop tests pass, including all 15 golden STI values from the independent reference and 4 new direct-sound ones. Sample room: front row 0.59, back row 0.58, fair, limited by echo; 20 m² of curtains lifts the back row to 0.65. 58 phone tests pass on the S24 Ultra. Cause rule awaiting your confirmation.)*
   *Skills:* sti-room-model, clearroom-testing.
   *Done when:* the golden STI tests pass within ±0.02 (NFR-4), and the sample room's back row scores below its front row.
-- [ ] **M7 — 3D core.** `Scene3D` (camera, projection, drag to rotate, pinch to zoom, shading) and V8, the 3D clarity room.
+- [x] **M7 — 3D core.** `Scene3D` (camera, projection, drag to rotate, pinch to zoom, shading) and V8, the 3D clarity room. *(Done Oct 26: 314 laptop + 69 phone tests pass. The Results tab shows V8 with a colour legend and names each band in words; drag turns the room, pinch zooms, double-tap returns to the home view behind the back row. TalkBack reads the front and back row bands. Before a clap and a noise reading exist, the tab lists what's still missing. Waiting on your smooth-rotation check on the phone.)*
   *Skills:* compose-3d-scene.
   *Done when:* the sample room's bars rotate smoothly on the phone.
 

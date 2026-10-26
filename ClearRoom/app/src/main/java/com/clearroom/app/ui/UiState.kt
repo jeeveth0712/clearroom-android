@@ -1,5 +1,6 @@
 package com.clearroom.app.ui
 
+import com.clearroom.app.acoustics.ClarityResult
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
@@ -19,6 +20,13 @@ data class UiState(
     val room: RoomUiState = RoomUiState(),
     val measure: MeasureUiState = MeasureUiState(),
 )
+
+/**
+ * A clarity result together with the session it was worked out from. It's computed off the main
+ * thread, so for a moment after switching rooms it can still describe the previous one: keeping the
+ * two together means a screen never draws one room's seats inside another room's walls.
+ */
+data class Evaluation(val session: Session, val result: ClarityResult)
 
 data class RoomUiState(
     val saved: List<SavedRoom> = emptyList(),

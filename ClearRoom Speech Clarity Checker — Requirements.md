@@ -331,6 +331,7 @@ Kept up to date during the build. The sections above are the original plan; this
 | Room echo time | RT60 per seat | One echo time per band for the room: the mean of every accepted clap at every seat, with its spread used for the STI range (NFR-10) | Reverberation is close to uniform across a room; pooling claps is steadier |
 | Noise at unmeasured seats | "Interpolate STI over the seat grid" | Noise is interpolated (inverse-distance-squared, in energy), then STI is calculated at every seat | Every seat then has a real calculation behind it, including its cause and required voice |
 | Back-row STI | Not specified | The worst seat in the back row | The goal is that every seat can follow |
+| 3D clarity room (V8) | Bar height = STI (0–1) | Bar height = STI × half the room height, with a 5 cm minimum; the speaker is an 8-sided cone 1.6 m tall. Double-tap returns to the starting view, from behind the back row with the front at the top as on the floor plan. TalkBack reads the front and back rows' bands | Bars then fit inside the room at its true scale, and a seat scoring 0 still shows; the 3D view needs a spoken alternative |
 
 ### Measured on the test phone (Samsung Galaxy S24 Ultra, Android 16)
 
