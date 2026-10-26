@@ -4,8 +4,8 @@ Read this first. It is the complete handover: what the project is, how the owner
 done, where everything is, what has been built, what is decided, what is still open, and the traps
 already hit. It is kept in the repository so it works from any account or tool.
 
-- **Last updated:** 2026-10-26, after milestone **M9** (commit `76e3515`).
-- **Next step:** milestone **M10 — Log tab** (section 9).
+- **Last updated:** 2026-10-27, after milestone **M10** (commit `6bf1863`).
+- **Next step:** milestone **M11 — PDF report + share, before/after** (section 9).
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
 
@@ -94,6 +94,7 @@ Skills (each `SKILL.md` is a focused how-to with the project's rules):
 - AGP 9.4.1 with built-in Kotlin. KGP 2.4.21 is forced through `buildscript { classpath(libs.kotlin.gradle.plugin) }`.
 - Gradle 9.6.0, Compose BOM 2026.09.00 (material3 1.4, which has no icon library: the tab icons are vector XML files).
 - lifecycle 2.11.0, coroutines 1.11.0.
+- MediaPipe Tasks Audio 1.1.1 (sound labels, M10), with Google's YAMNet model bundled at `app/src/main/assets/yamnet.tflite` (`noCompress += "tflite"`). Downloaded once at build time; runs offline.
 - Tests use org.json 20260814 (the real library, because android.jar's copy is a stub) and `kotlin-test-junit`.
 
 **App configuration:**
@@ -132,8 +133,8 @@ cd ClearRoom
 ## 5. Architecture
 
 **Packages:**
-- **Engine (pure Kotlin, no `android.*`, `androidx.*` or `org.json` imports):** `dsp/`, `acoustics/`, `measure/`, `data/Models.kt`, `viz/math3d/`. Tested on the plain JVM.
-- **Android and UI:** `audio/`, `data/Store.kt` + `RoomJson.kt` (org.json, AtomicFile), `permission/`, `ui/`, `viz/` (Compose).
+- **Engine (pure Kotlin, no `android.*`, `androidx.*` or `org.json` imports):** `dsp/`, `acoustics/`, `measure/`, `data/Models.kt`, `daylog/`, `viz/math3d/`. Tested on the plain JVM.
+- **Android and UI:** `audio/` (including `YamnetLabeller.kt`), `data/Store.kt` + `RoomJson.kt` (org.json, AtomicFile), `permission/`, `ui/`, `viz/` (Compose).
 
 **Data flow:**
 - `MainActivity` creates the `AppViewModel` through `AppContainer`, the composition root (Recorder, JsonRoomStore, dispatchers).
@@ -141,8 +142,10 @@ cd ClearRoom
 - Derived flows are computed on the DSP dispatcher, and each result carries the inputs it came from, so screens never mix one room's results with another room:
   - `vm.clarity: StateFlow<Evaluation?>`, where `Evaluation(session, result: ClarityResult, grid: ClarityGrid?)` comes from `Evaluation.of(session)`.
   - `vm.fixes: StateFlow<FixesView?>`, where `FixesView(session, settings, outcome)` comes from `FixesView.of(...)`. It uses `conflate()` because sliders change fast.
+  - `vm.log: StateFlow<DayLogView?>`, where `DayLogView(log: DayLogState, logSpot, summary: LogSummary?)` combines the day-log controller's state with the session and the picked seat.
   - `vm.liveLevelDb` is kept separate, so the level meter doesn't recompose the app.
-- `ClearRoomApp`: a `Scaffold` with 5 tabs (Room, Measure, Results, Fixes, Log). The selected tab is kept with `rememberSaveable`.
+- `ClearRoomApp`: a `Scaffold` with 5 tabs (Room, Measure, Results, Fixes, Log). The selected tab is kept with `rememberSaveable`. While a day log runs, `KeepScreenOn` holds the screen on app-wide.
+- **One recording at a time:** the day log and a measurement share the microphone. A measurement is refused while a log runs (`CaptureProblem.IN_USE_BY_DAY_LOG`) and Start log is disabled while measuring. Opening or creating another room stops the log; deleting a room deletes its logs.
 
 **Key files:**
 - **DSP:**
@@ -162,12 +165,20 @@ cd ClearRoom
   - `ClapCurves` / `BandCurve` / `DecayFit`.
 
   `RoomForm.kt` validates the room form, including the seat-fit check. `SampleData.kt` is a 9 × 7 × 3.2 m room with 5 × 6 seats and 3 measured seats.
+- **Day log (M10):**
+  - `audio/AudioInput.blocks(blockSeconds)`: an endless flow of back-to-back clips from one open microphone (`Recorder` shares the open/effects/release code with `record`).
+  - `dsp/StreamingOctaveBank.kt`: band levels per 1-s block with filter state kept across blocks.
+  - `daylog/LogModels.kt`: `LogSecond`, `SoundLabel` (fan, traffic, horn, talking, music, quiet, other), `SoundLabeller`, `SoundLabels.fromYamnet`.
+  - `daylog/LogStats.kt`: periods, Leq, L90, events, `backRowSti` (FR-10), `logSpot`; `LogSummary`.
+  - `daylog/LogStore.kt`: `CsvLogStore` (`filesDir/logs/<roomId>/<start>.csv`).
+  - `daylog/DayLogController.kt`: start, stop, show the latest log, clear.
+  - `audio/YamnetLabeller.kt`: MediaPipe wrapper; `create()` returns null if the model can't load, and the log keeps levels only.
 - **UI:**
-  - `ui/screens/`: `RoomScreen`, `MeasureScreen`, `ResultsScreen`, `FixesScreen`, plus `ResultsParts.kt` (shared cards and band/cause wording).
+  - `ui/screens/`: `RoomScreen`, `MeasureScreen`, `ResultsScreen`, `FixesScreen`, `LogScreen`, plus `ResultsParts.kt` (shared cards and band/cause wording).
   - `ui/theme/`: `StiColors.kt` (fixed band colours), `SceneColors.kt` (3D palette).
 - **Visualizations:**
-  - 2D: `viz/ChartKit.kt` (Axis with nice ticks, `drawFrame`, `ChartStyle`, `ChartColors`, `decimals()`), `SeatMap.kt`, `Rt60Chart.kt`, `DecayChart.kt`, `SeatCharts.kt` (V13–V15), `FixCharts.kt` (V6, V7), `RoomPlan.kt`.
-  - 3D: `viz/Scene3D.kt` (renderer, gestures, `FramedScene3D`), `ClarityRoom3D.kt` (V8, V12), `Surfaces3D.kt` (V9, V10), and `math3d/` (`Vec3`, `Mat4`, `OrbitCamera`, `Projection`, `Face3`, `Solid`, `SceneGeometry`, `ScenePass`, `Argb`).
+  - 2D: `viz/ChartKit.kt` (Axis with nice ticks, `drawFrame`, `ChartStyle`, `ChartColors`, `decimals()`), `SeatMap.kt`, `Rt60Chart.kt`, `DecayChart.kt`, `SeatCharts.kt` (V13–V15), `FixCharts.kt` (V6, V7), `DayLogCharts.kt` (V5, clock times, sound-label colours), `RoomPlan.kt`.
+  - 3D: `viz/Scene3D.kt` (renderer, gestures, `FramedScene3D`), `ClarityRoom3D.kt` (V8, V12), `Surfaces3D.kt` (V9, V10, and `chartView()` shared with V11), `NoiseLandscape3D.kt` (V11), and `math3d/` (`Vec3`, `Mat4`, `OrbitCamera`, `Projection`, `Face3`, `Solid`, `SceneGeometry`, `ScenePass`, `Argb`).
 
 **3D renderer:**
 - **Painting order:** the ground layer (inward-facing walls and the floor) is drawn first, so walls nearest the camera are culled into a cut-away view. Solids such as bars and the cone are then sorted as wholes, loose mesh faces individually, followed by lines and labels.
@@ -212,6 +223,13 @@ cd ClearRoom
 
 **Required voice:** bisection over −20 to +40 dB; returns `Unreachable` when echo caps it.
 
+**Day log:**
+- 1-s blocks: 7 band levels plus a YAMNet label per second (score ≥ 0.3, mapped to 7 plain words; "Honk" is a goose, so it maps to other).
+- Periods: 1 min for logs up to 15 min, 5 min up to 2 h, 1 h beyond. Leq = energy mean; L90 = 10th percentile of the seconds.
+- Events: same-label seconds merged across gaps up to 10 s; "other" and "quiet" never make an event.
+- Back-row STI per period (FR-10): each period's per-band change versus the noise snapshot at the log seat is applied to every measured seat, then the engine runs again.
+- Approximate dBA on the Log tab = dBFS + 112.35, always labelled "about".
+
 **Fixes (`Fixes.kt`):**
 - Curtains use the doc's α table: 0.14, 0.35, 0.55, 0.72, 0.70, 0.65, 0.65.
 - Each student adds 0.15, 0.25, 0.35, 0.45, 0.50, 0.50, 0.50 m² of absorption per band.
@@ -231,6 +249,7 @@ The **Implementation notes** in the requirements doc list every deviation with i
 - Rooms are stored one per file at `filesDir/rooms/<id>.json`, written with AtomicFile, at `schemaVersion` 1.
 - Non-finite numbers are written as `null`. Older files without `lastClap` still load, and damaged curves are dropped without losing the room.
 - The sample room is never written to disk. "Save" on the sample copies only its layout, with a new id (a bug once copied its made-up readings).
+- Day logs are stored one per file at `filesDir/logs/<roomId>/<start millis>.csv`: one line per second (time, 7 band levels, label word), flushed every 60 s. A cut-off last line is skipped on reading; room ids are checked against `[A-Za-z0-9-]{1,64}` before they become a folder name.
 - No audio is ever stored (NFR-6), only numbers and labels. There is no INTERNET permission.
 
 ## 8. Screens and views
@@ -254,14 +273,22 @@ The **Implementation notes** in the requirements doc list every deviation with i
   - controls (curtains, students, fans, microphone, voice, speaker position, reset);
   - V6;
   - V7.
-- **Log:** still only its introduction text; this is M10.
+- **Log:**
+  - start/stop, with the "Recording levels, not audio" banner, the timer, the live level and the log seat;
+  - a summary (start, length, about-dBA Leq and background, loudest event);
+  - V5 (noise panel with events above, back-row STI panel below);
+  - V11;
+  - the latest 12 events;
+  - "Clear this room's day logs" (with a confirmation; not while logging).
+  - The sample room can't be logged into.
 
 | View | Status |
 | --- | --- |
-| V1 seat heatmap, V2 cause map, V3 decay curve, V4 RT60 by band, V6 fix ranking, V7 required voice | done |
-| V8 3D room, V9 clarity terrain, V10 echo waterfall, V12 what-if morph | done |
+| V1 seat heatmap, V2 cause map, V3 decay curve, V4 RT60 by band, V5 day clarity timeline, V6 fix ranking, V7 required voice | done |
+| V8 3D room, V9 clarity terrain, V10 echo waterfall, V11 noise landscape, V12 what-if morph | done |
 | V13 MTF, V14 speech vs distance, V15 octave spectrum | done |
-| **V5 day clarity timeline, V11 noise landscape (3D)** | **to do in M10** |
+
+All 15 views are built.
 
 ## 9. Milestones
 
@@ -276,16 +303,17 @@ The **Implementation notes** in the requirements doc list every deviation with i
 | M7 | Scene3D + V8 | done `ba14819` (+ `5bf5667` seat fit, `de960ab` V8 look) |
 | M8 | Results tab: verdict, V1, V2, seat details, V3, V4, V9, V10, V13–V15 | done `4a63fda` |
 | M9 | Fixes tab: what-if controls, V12, V6, V7 | done `76e3515` |
-| **M10** | **Log tab: NoiseLog (1 s band levels), YAMNet labels, keep-screen-on, V5, V11** | **next** |
-| M11 | PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13) | to do |
+| M10 | Log tab: day noise log (1 s band levels), YAMNet labels, keep-screen-on, V5, V11, clear logs | done `6bf1863` |
+| **M11** | **PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13)** | **next** |
 | M12 | Finish: empty states, error text, app icon, release APK; full bug and vulnerability audit | to do |
-| M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms | to do |
+| M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log) | to do |
 
-**Notes for M10:**
-- Read `.claude/skills/noise-day-log/SKILL.md` first.
-- **MediaPipe Tasks Audio + the YAMNet model is a new third-party dependency.** Tell the owner first that it is downloaded once from Google's Maven repository (and the model file once), then runs offline.
-- The doc's fallback order if time runs short: drop the YAMNet labels first, then the PDF, then the V12 animation.
-- Day log decision (plan Part E): keep the screen on, with the phone on the charger.
+**Notes for M11:**
+- Read `.claude/skills/storage-and-pdf-report/SKILL.md` first.
+- No new third-party library is planned: `PdfDocument`, `FileProvider` (androidx.core, already present) and the existing `DrawScope` chart functions.
+- The FileProvider exposes only `cache/reports/`; never the files root (rooms and logs live there).
+- Before/after: freeze the current results as a baseline, show V1 and V4 side by side on the same scale.
+- The doc's fallback order if time runs short: drop the PDF before the V12 animation (YAMNet labels are already built).
 
 ## 10. Decisions still open (owner's call; current default in bold)
 
@@ -296,18 +324,20 @@ The **Implementation notes** in the requirements doc list every deviation with i
 2. **Distance model:** **classical Sabine field, built.** Barron's revised theory would make back rows a little worse; it was offered and the owner hasn't answered.
 3. **Fix costs in ₹:** the doc wants ₹ prices on V6. **The app shows free / low / medium cost** until the owner gives prices (for 20 m² of heavy curtains and a portable mic set).
 4. **Soft-board absorption:** there is no sourced α table, so **soft boards are left out** of the fixes. The same applies to tile, glass and wood (plan Part E #6). Surface tags aren't used by the engine, because the Sabine fit uses measured RT60.
-5. Settled already:
+5. **Screen-off day logging (NFR-9):** **not built.** The screen stays on while a log runs (plan Part E, decision 3). Logging with the screen off needs a microphone foreground service and its notification; offer it only if the owner asks.
+6. Settled already:
    - noise snapshot 30 s;
    - clap rejection limit 30 dB;
    - ξ limit 40 ‰;
    - claps pooled per room;
    - a row is judged by its worst seat;
-   - the sample can't be measured into; saving it copies the layout only.
-6. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
+   - the sample can't be measured into; saving it copies the layout only;
+   - day-log events: 10 s gap bridging, "other" excluded (seen on the phone: a fan's label flickers).
+7. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
 
 ## 11. Testing
 
-**Current counts:** 438 JVM tests, 86 device tests, lint 0 issues. All pass at `76e3515`.
+**Current counts:** 499 JVM tests, 101 device tests, lint 0 issues. All pass at `6bf1863`.
 
 **Conventions:**
 - **Naming:** JVM tests use `kotlin.test` with backtick sentence names; androidTest uses camelCase names with JUnit4 and `createComposeRule` (v2).
@@ -315,11 +345,12 @@ The **Implementation notes** in the requirements doc list every deviation with i
 - **Test helpers** (`app/src/test/java/com/clearroom/app/testing/`):
   - builders `aRoom()`, `aValidForm()`, `flatBands()`, `aMeasuredSeat()`;
   - `Signals.syntheticClap(t60S, seed)`;
-  - `FakeAudioInput`, `InMemoryRoomRepository`, `MainDispatcherRule`.
+  - `FakeAudioInput` (also fakes `blocks()`), `InMemoryRoomRepository`, `InMemoryLogStore` + `ScriptedLabeller`, `MainDispatcherRule`.
 - **ViewModel tests:**
   - `startApp()` creates the ViewModel and runs its startup.
   - `startWithRoom(...)` saves room "r1" first.
   - Use `runCurrent()` / `advanceUntilIdle()`.
+  - A test that starts a day log must stop it (`UiEvent.StopLog` + `runCurrent()`): the fake block flow is endless, and `runTest` waits for it forever.
 - **Device tests:**
   - Scroll before asserting: `performScrollTo()` for `verticalScroll` columns, `performScrollToNode` only in lazy lists.
   - Resolve strings with `context.getString` or `getQuantityString`.
@@ -334,6 +365,11 @@ The **Implementation notes** in the requirements doc list every deviation with i
 - Lint `PluralsCandidate`: write "%1$d of %2$d seats" as a `<plurals>`, or put the number at the end ("Students in the room: %1$d").
 - `@ExperimentalMaterial3Api` is needed for `SegmentedButton`; `animateFloatAsState` in a loop is fine while the count is fixed (wrap it in `key(...)`).
 - Two same-named `private`/`internal` composables in one package (`InfoCard`) cause overload ambiguity, so share them from `ui/screens/ResultsParts.kt`.
+- A backtick test name can't contain `:` (it fails to compile on the JVM target); use `-`.
+
+**Coroutines:**
+- `withContext(NonCancellable + io) { … }` in a `finally` still rethrows `CancellationException` when it returns into the cancelled coroutine, so code **after** it never runs. Put every state update **inside** the block (this kept the day log saying "running" after Stop).
+- An endless flow collected in `viewModelScope` keeps `runTest` busy forever: stop it in the test.
 
 **Numbers and maths:**
 - **Negative zero:** `round(x)*step` can give `-0.0`, which prints as "-0.0". `Axis.ticks` adds `+ 0.0`; `decimals()` prints 0 for values that round to zero.
@@ -350,6 +386,7 @@ The **Implementation notes** in the requirements doc list every deviation with i
 **Product:**
 - Seats that don't fit merged into one block of bars, which is why the room form has a seat-fit check.
 - The theme's primary blue looked like the "good" band colour. Fixed band colours live in `StiColors.kt`; the 3D scene uses `SceneColors`; other charts use `ChartColors` (never band hues).
+- On the phone YAMNet's label for a steady fan flickers between "fan" and "other" every few seconds. With a 2 s gap, one minute of fan became a dozen events; hence the 10 s gap and no "other" events.
 
 ## 13. Checking on the phone (screenshots and taps)
 
@@ -373,6 +410,6 @@ Other tools:
 ## 14. Resuming: checklist
 
 1. `git pull`; read this file, then the requirements doc's Implementation notes, then the skill for the next milestone.
-2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 438 JVM + 86 device tests.
+2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 499 JVM + 101 device tests.
 3. Tell the owner what you're about to build, and which third-party tools it needs.
 4. Follow the milestone loop (section 2). At the end, update this file's "Last updated" line, sections 8–11 and the commit table.
