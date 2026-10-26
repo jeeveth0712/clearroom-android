@@ -315,7 +315,7 @@ Kept up to date during the build. The sections above are the original plan; this
 | Area | Change | Why |
 | --- | --- | --- |
 | Data model | Band levels are stored as a 7-value list type (`BandLevels`), not `DoubleArray`; every `Room` has a stable id used for its file name | Arrays compare by reference, so changed readings could silently fail to update the screen; file names never come from user-typed text |
-| Measuring | The built-in sample room can be explored but not measured into; saving it makes the user's own copy | Keeps the reference example unchanged |
+| Measuring | The built-in sample room can be explored but not measured into; saving it makes the user's own copy of its **layout only**, without its illustrative readings. Any seat's readings can be cleared (with a confirmation) | Keeps the reference example unchanged, and its made-up numbers out of real results |
 | Toolchain | Android Studio Rabbit 1 (2026.2.1), AGP 9.4.1, Kotlin raised from the template's 2.2.10 to 2.4.21, Compose BOM 2026.09.00 | Kotlin 2.2.10 is only tested up to AGP 8.10; 2.4.21 is tested with this Gradle and much closer to this AGP |
 | Icons | Tab icons drawn as small vector files | Material 3 1.4 no longer bundles the Material icon library |
 | Testing | On-phone tests run in a separate test app (`com.clearroom.app.uitest`) | The test runner uninstalls the app it tests; this way it never erases the user's saved rooms |

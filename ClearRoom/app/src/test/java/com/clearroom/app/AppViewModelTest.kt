@@ -474,15 +474,33 @@ class AppViewModelTest {
     }
 
     @Test
-    fun `saving the sample makes the user's own copy with a new id and the sample measurements`() = runTest {
+    fun `saving the sample makes the user's own copy of its layout, without its made-up readings`() = runTest {
+        // Regression (Oct 26): the sample's illustrative noise, claps and voice were copied into the
+        // user's real room, showing as measured seats and mixing into real results.
         viewModel.onEvent(UiEvent.LoadSampleRoom)
         viewModel.onEvent(UiEvent.SaveRoom)
         runCurrent()
         val savedId = roomState.editingId
         assertNotEquals(SampleData.ROOM_ID, savedId)
         val stored = assertNotNull(rooms.load(assertNotNull(savedId)))
-        assertEquals(SampleData.session.seats, stored.seats)
+        assertEquals(SampleData.room.copy(id = savedId), stored.room)
+        assertEquals(emptyList(), stored.seats)
+        assertNull(stored.voice)
         assertNull(rooms.load(SampleData.ROOM_ID))
+    }
+
+    @Test
+    fun `clearing a seat removes its noise and claps, and only in the user's own room`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(1, 1), aMeasuredSeat(2, 2))
+        vm.onEvent(UiEvent.ClearSeat(SeatId(1, 1)))
+        runCurrent()
+        assertEquals(listOf(SeatId(2, 2)), assertNotNull(rooms.load("r1")).seats.map { it.seat })
+        assertEquals(MeasurePhase.Idle, vm.phase())
+
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.ClearSeat(SeatId(0, 2)))
+        runCurrent()
+        assertEquals(SampleData.session, vm.state.value.session, "the sample itself is never changed")
     }
 
     @Test

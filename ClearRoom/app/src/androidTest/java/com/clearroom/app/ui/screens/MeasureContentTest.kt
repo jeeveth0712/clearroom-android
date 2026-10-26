@@ -167,6 +167,24 @@ class MeasureContentTest {
         node(R.string.measure_recording_voice, MeasureKind.VOICE.durationS).assertIsDisplayed()
     }
 
+    @Test
+    fun clearingASeat_asksFirst_andOnlyClearsWhenConfirmed() {
+        show(measure = MeasureUiState(selectedSeat = SeatId(2, 3))) // a seat with readings in the user's copy
+        node(R.string.measure_seat_clear).performClick()
+        compose.onNodeWithText(text(R.string.measure_seat_clear_keep)).performClick()
+        assertEquals(emptyList<UiEvent>(), events)
+
+        node(R.string.measure_seat_clear).performClick()
+        compose.onNodeWithText(text(R.string.measure_seat_clear_confirm)).performClick()
+        assertEquals(listOf<UiEvent>(UiEvent.ClearSeat(SeatId(2, 3))), events)
+    }
+
+    @Test
+    fun aSeatWithoutReadings_offersNothingToClear() {
+        show(measure = MeasureUiState(selectedSeat = SeatId(1, 1)))
+        compose.onNodeWithText(text(R.string.measure_seat_clear)).assertDoesNotExist()
+    }
+
     // --- Echo (clap test) card --------------------------------------------------------------
 
     @Test

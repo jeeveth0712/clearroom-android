@@ -84,6 +84,9 @@ data class SeatMeasure(
     }
 
     val seat: SeatId get() = SeatId(row, col)
+
+    /** True when anything was measured here: a noise reading or at least one clap. */
+    val hasReadings: Boolean get() = noise != null || rtTakes.isNotEmpty()
 }
 
 /** A room plus its measurements. Audio is never part of it (NFR-6). */
@@ -115,6 +118,9 @@ data class Session(
     /** FR-2: adds one accepted clap take at [seat], keeping the earlier takes and the noise. */
     fun withClap(seat: SeatId, take: RtTake): Session =
         updateSeat(seat) { it.copy(rtTakes = it.rtTakes + take) }
+
+    /** Removes everything measured at [seat] (noise and claps), as if it had never been measured. */
+    fun withoutSeat(seat: SeatId): Session = copy(seats = seats.filterNot { it.seat == seat })
 
     /** Clears the clap takes at [seat] so they can be redone; its noise reading stays. */
     fun withoutClaps(seat: SeatId): Session =

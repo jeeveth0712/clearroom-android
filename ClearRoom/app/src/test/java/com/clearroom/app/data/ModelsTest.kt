@@ -150,6 +150,20 @@ class ModelsTest {
         assertEquals(session, session.withoutClaps(SeatId(4, 4))) // nothing there: unchanged
     }
 
+    @Test
+    fun `clearing a seat removes all its readings and leaves the others`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 0), aMeasuredSeat(1, 1)))
+        assertEquals(listOf(SeatId(1, 1)), session.withoutSeat(SeatId(0, 0)).seats.map { it.seat })
+        assertEquals(session, session.withoutSeat(SeatId(4, 4)))
+    }
+
+    @Test
+    fun `a seat has readings once it has noise or at least one clap`() {
+        assertEquals(false, SeatMeasure(0, 0).hasReadings)
+        assertEquals(true, SeatMeasure(0, 0, noise = flatBands(-60.0)).hasReadings)
+        assertEquals(true, SeatMeasure(0, 0, rtTakes = listOf(RtTake(List(7) { 1.0 }))).hasReadings)
+    }
+
     private fun assertNotNullSeat(session: Session, seat: SeatId) =
         session.measureAt(seat) ?: throw AssertionError("no measurement at $seat")
 

@@ -96,6 +96,7 @@ class AppViewModel(
             UiEvent.CancelRecording -> cancelMeasurement()
             is UiEvent.SetClapDelay -> setClapDelay(event.seconds)
             is UiEvent.ClearClaps -> clearClaps(event.seat)
+            is UiEvent.ClearSeat -> clearSeat(event.seat)
             is UiEvent.RoomFormChanged -> updateRoom { it.copy(form = event.form, problems = emptyMap(), notice = null) }
             UiEvent.SaveRoom -> viewModelScope.launch { saveRoom() }
             UiEvent.NewRoom -> newRoom()
@@ -161,11 +162,16 @@ class AppViewModel(
             }
         }
 
-    private fun clearClaps(seat: SeatId) {
+    private fun clearClaps(seat: SeatId) = clearReadings { it.withoutClaps(seat) }
+
+    private fun clearSeat(seat: SeatId) = clearReadings { it.withoutSeat(seat) }
+
+    /** Removes readings from the user's own room (never the sample), unless a recording is running. */
+    private fun clearReadings(change: (Session) -> Session) {
         val roomId = _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
         if (_state.value.measure.phase.isBusy) return
         viewModelScope.launch {
-            val saved = saveMeasurement(roomId) { it.withoutClaps(seat) }
+            val saved = saveMeasurement(roomId, change)
             setPhase(if (saved == null) MeasurePhase.SaveFailed else MeasurePhase.Idle)
         }
     }
@@ -220,12 +226,14 @@ class AppViewModel(
 
     private suspend fun saveRoom() {
         val current = _state.value
-        // The sample is read-only: saving it creates the user's own copy with a fresh id.
-        val id = current.room.editingId?.takeUnless { it == SampleData.ROOM_ID } ?: newRoomId()
+        // The sample is read-only: saving it creates the user's own copy with a fresh id. Only its
+        // layout is copied: its readings are illustrative, and must never mix with real measurements.
+        val fromSample = current.room.editingId == SampleData.ROOM_ID
+        val id = current.room.editingId?.takeUnless { fromSample } ?: newRoomId()
         when (val result = current.room.form.toRoom(id)) {
             is RoomForm.Result.Invalid -> updateRoom { it.copy(problems = result.problems, notice = null) }
             is RoomForm.Result.Valid -> {
-                val session = current.session?.withRoom(result.room) ?: Session(result.room)
+                val session = if (fromSample) Session(result.room) else current.session?.withRoom(result.room) ?: Session(result.room)
                 try {
                     rooms.save(session)
                 } catch (e: IOException) {

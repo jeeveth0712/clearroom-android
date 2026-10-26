@@ -77,6 +77,7 @@ sealed interface UiEvent {
     data object CancelRecording : UiEvent
     data class SetClapDelay(val seconds: Int) : UiEvent
     data class ClearClaps(val seat: SeatId) : UiEvent
+    data class ClearSeat(val seat: SeatId) : UiEvent
 
     data class RoomFormChanged(val form: RoomForm) : UiEvent
     data object SaveRoom : UiEvent

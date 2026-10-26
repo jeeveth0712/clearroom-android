@@ -106,7 +106,12 @@
     <string name="measure_seat_hint">Tap the seat where the phone is. The front of the room, with the speaker, is at the top.</string>
     <string name="measure_seat_none">No seat picked yet.</string>
     <string name="seat_label">Row %1$d, seat %2$d</string>
-    <string name="seat_measured">noise measured</string>
+    <string name="seat_measured">has readings</string>
+    <string name="measure_seat_clear">Clear this seat\'s readings</string>
+    <string name="measure_seat_clear_title">Clear readings at %1$s?</string>
+    <string name="measure_seat_clear_body">Its noise reading and claps are deleted. You can measure it again.</string>
+    <string name="measure_seat_clear_confirm">Clear</string>
+    <string name="measure_seat_clear_keep">Keep</string>
 
     <!-- Measure tab: echo / clap test (FR-2, FR-3) -->
     <string name="measure_clap_title">Echo (clap test)</string>
