@@ -54,7 +54,7 @@ No Critical findings. No audio reaches storage, logs or the PDF (NFR-6 holds).
   R8's four `-dontwarn` lines for classes MediaPipe refers to but never uses here. The APK also dropped to 34 MB.
 - **Check:** the release APK installed over the debug app (same key, data kept) starts and shows the sample
   room exactly as the debug build does ("Fair · 0.57–0.58", main cause echo, front rows "Fair · 0.59"). It also
-  writes the PDF and opens the share sheet, with no crash in the log.
+  writes the PDF and opens the share sheet, and runs a day log whose sound labels work (MediaPipe after shrinking: a fan was labelled), with no crash in the log.
 
 ### 3. [Low] Old protobuf and Guava inside MediaPipe — PLAUSIBLE (not reachable), fixed
 

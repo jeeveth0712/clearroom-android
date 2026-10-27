@@ -5,7 +5,7 @@ done, where everything is, what has been built, what is decided, what is still o
 already hit. It is kept in the repository so it works from any account or tool.
 
 - **Last updated:** 2026-10-27, after milestone **M12** (commit `b7291bf`).
-- **Next step:** milestone **M13 — self-test screen and field tests** (section 9); first, try a day log on the release APK.
+- **Next step:** milestone **M13 — self-test screen and field tests** (section 9).
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
 
@@ -338,7 +338,7 @@ All 15 views are built.
 | **M13** | **Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains)** | **next** |
 
 **Notes for M13:**
-- **First:** install the release APK (`ClearRoom/app/build/outputs/apk/release/app-release.apk`) and run a short day log in a throwaway room. That's the one release path not yet tried on the phone (MediaPipe after shrinking). If the labels say "weren't available", or the app crashes, check the keep rules. Delete the throwaway room afterwards, and don't log into the owner's room.
+- The release APK has been checked on the phone (start, sample results, PDF and share, a day log with labels). The phone currently has the **release** build installed; `installDebug` replaces it (same key, rooms kept).
 - Read `.claude/skills/clearroom-testing/SKILL.md`; `scripts/sti_reference.py` gives the self-test's golden STI values.
 - The field tests need the owner in real rooms: plan them with the owner, don't script them.
 - Before the video, remind the owner not to screen-record with the phone's microphone on.
