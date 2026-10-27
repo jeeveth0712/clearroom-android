@@ -337,7 +337,9 @@ class MeasureContentTest {
         show(measure = MeasureUiState(selectedSeat = seat))
         val takes = requireNotNull(ownRoom.measureAt(seat)).rtTakes
         val repeatability = requireNotNull(FieldChecks.repeatability(takes))
-        node(R.string.field_repeat_ok, repeatability.claps, (repeatability.worstVariation * 100).roundToInt()).assertIsDisplayed()
+        val repeatText = InstrumentationRegistry.getInstrumentation().targetContext.resources.getQuantityString(
+            R.plurals.field_repeat_ok, repeatability.claps, repeatability.claps, (repeatability.worstVariation * 100).roundToInt())
+        compose.onNodeWithText(repeatText).performScrollTo().assertIsDisplayed()
         node(R.string.measure_clap_more, takes.size).assertIsDisplayed()
     }
 

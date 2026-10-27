@@ -11,7 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -26,12 +27,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
@@ -99,39 +100,46 @@ private fun ShareReport(report: ReportState, onShown: () -> Unit) {
 }
 
 /**
- * The five tabs as a floating pill above the system navigation: black (raised grey at night) with
- * the open tab in a lime pill. Each tab is one selectable item, so TalkBack reads "Results, tab,
- * selected" from its visible label.
+ * The five tabs as a floating bar above the system navigation: black by day, dark grey with a
+ * thin edge at night, with the open tab's icon and name in lime. Each tab is one selectable item,
+ * so TalkBack reads "Results, tab, selected" from its visible label.
  */
 @Composable
 private fun AppNavigationBar(selected: AppTab, onTabSelected: (AppTab) -> Unit) {
     val brand = ClearRoomTheme.brand
+    val shape = RoundedCornerShape(28.dp)
     Row(
         Modifier
             .fillMaxWidth()
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 10.dp)
-            .clip(CircleShape)
+            .clip(shape)
             .background(brand.navBar)
+            .then(brand.navBorder?.let { Modifier.border(1.dp, it, shape) } ?: Modifier)
             .selectableGroup()
-            .padding(6.dp),
+            .padding(horizontal = 6.dp, vertical = 4.dp),
     ) {
         AppTab.entries.forEach { tab ->
             val isSelected = tab == selected
-            val content = if (isSelected) brand.onNavSelected else brand.onNavBar
+            val content = if (isSelected) brand.navSelected else brand.onNavBar
             Column(
                 Modifier
                     .weight(1f)
-                    .clip(CircleShape)
-                    .background(if (isSelected) brand.navSelected else Color.Transparent)
+                    .clip(RoundedCornerShape(20.dp))
                     .selectable(selected = isSelected, role = Role.Tab, onClick = { onTabSelected(tab) })
-                    .padding(vertical = 8.dp),
+                    .padding(vertical = 10.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 // The visible label already names the tab for TalkBack.
                 Icon(painterResource(tab.iconRes), contentDescription = null, tint = content, modifier = Modifier.size(22.dp))
-                Text(stringResource(tab.labelRes), style = MaterialTheme.typography.labelSmall, color = content, maxLines = 1)
+                Text(
+                    stringResource(tab.labelRes),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = if (isSelected) FontWeight.ExtraBold else FontWeight.SemiBold,
+                    color = content,
+                    maxLines = 1,
+                )
             }
         }
     }

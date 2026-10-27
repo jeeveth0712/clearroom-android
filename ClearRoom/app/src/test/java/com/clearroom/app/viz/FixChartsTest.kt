@@ -13,7 +13,8 @@ import com.clearroom.app.data.SeatId
 import com.clearroom.app.ui.screens.VoiceEffort
 import com.clearroom.app.ui.screens.speechEchoS
 import com.clearroom.app.ui.screens.voiceEffort
-import com.clearroom.app.ui.theme.color
+import com.clearroom.app.acoustics.FixSettings
+import com.clearroom.app.acoustics.Fixes
 import com.clearroom.app.viz.math3d.Argb
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -27,24 +28,22 @@ class FixChartsTest {
     // --- V6 ---------------------------------------------------------------------------------------
 
     @Test
-    fun `the gain scale always shows 0 and every whisker`() {
-        val axis = gainAxis(listOf(fix(0.07, 0.06, 0.08), fix(-0.01, -0.03, 0.0)))
-        assertTrue(axis.min < -0.03 && axis.max > 0.08)
-        assertTrue(axis.fraction(0.0) in 0.0..1.0)
+    fun `the improvement scale contains today's score and every result range`() {
+        val axis = improvementAxis(listOf(fix(0.07, 0.06, 0.08), fix(-0.01, -0.03, 0.0)), 0.57)
+        assertTrue(axis.min < 0.54 && axis.max > 0.65)
+        assertTrue(axis.fraction(0.57) in 0.0..1.0)
     }
 
     @Test
     fun `tiny gains still get a readable scale`() {
-        val axis = gainAxis(listOf(fix(0.0)))
-        assertTrue(axis.max >= 0.1)
+        val axis = improvementAxis(listOf(fix(0.0)), 0.57)
+        assertTrue(axis.max - axis.min >= 0.15)
     }
 
     @Test
-    fun `a bar takes the colour of the score it would reach, and no gain is grey`() {
-        assertEquals(StiBand.GOOD.color(), fixBarColour(0.57, fix(0.07)))
-        assertEquals(StiBand.FAIR.color(), fixBarColour(0.57, fix(0.01)))
-        assertEquals(ChartColors.Noise, fixBarColour(0.57, fix(0.0)))
-        assertEquals(ChartColors.Noise, fixBarColour(0.57, fix(-0.02)))
+    fun `score scale stays within physical 0 to 1 bounds`() {
+        assertEquals(0.0, scoreAxis(-0.2, 0.02, 0.15).min)
+        assertEquals(1.0, scoreAxis(0.98, 1.2, 0.15).max)
     }
 
     // --- V7 ---------------------------------------------------------------------------------------
@@ -71,6 +70,25 @@ class FixChartsTest {
     // --- Summary and V12 ----------------------------------------------------------------------------
 
     private val clarity = (ClarityModel.evaluate(SampleData.session) as ClarityResult.Ready).room
+
+    @Test
+    fun `row comparison uses each row's worst seat in both states`() {
+        val after = (ClarityModel.evaluate(SampleData.session, FixSettings(curtainM2 = 20.0).toWhatIf(SampleData.room)) as ClarityResult.Ready).room
+        val rows = rowComparison(clarity, after)
+        assertEquals(clarity.rows, rows.size)
+        assertEquals(clarity.worstSeat(0), rows.first().now)
+        assertEquals(after.worstSeat(after.rows - 1), rows.last().after)
+    }
+
+    @Test
+    fun `voice rows retain one point per row and an axis around their levels`() {
+        val outcome = requireNotNull(Fixes.outcome(SampleData.session, FixSettings()))
+        val rows = voiceRows(outcome, 0.0)
+        assertEquals(clarity.rows, rows.size)
+        val axis = voiceAxis(rows)
+        assertTrue(rows.all { it.nowDba in axis.min..axis.max })
+        assertTrue(rows.mapNotNull { it.neededDba }.all { it in axis.min..axis.max })
+    }
 
     @Test
     fun `the echo time people quote is the speech bands' mean`() {

@@ -70,6 +70,9 @@ class FieldChecksTest {
         assertEquals(speechEcho(predicted), check.predictedS, 1e-9)
         assertEquals(check.predictedS, check.measuredS, 0.01)
         assertTrue(check.passed)
+        val zone = assertNotNull(check.passZoneS)
+        assertTrue(check.measuredS in zone)
+        assertTrue(check.predictedS in zone)
     }
 
     @Test

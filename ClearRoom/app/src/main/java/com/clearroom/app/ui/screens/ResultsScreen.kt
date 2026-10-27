@@ -54,7 +54,8 @@ import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.formatDateTime
 import com.clearroom.app.ui.formatMetres
 import com.clearroom.app.viz.BAND_NAMES
-import com.clearroom.app.viz.ClarityRoom3D
+import com.clearroom.app.viz.ClassroomClarity3D
+import com.clearroom.app.viz.DeskCallout
 import com.clearroom.app.viz.ClarityTerrain3D
 import com.clearroom.app.viz.DecayChart
 import com.clearroom.app.viz.DistanceChart
@@ -104,7 +105,8 @@ fun ResultsScreen(session: Session?, evaluation: Evaluation?, report: ReportStat
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader(AppTab.RESULTS, R.string.results_intro)
+        ScreenHeader(AppTab.RESULTS, if (session == null) R.string.results_intro else null,
+            subtitle = { session?.let { InfoChip(R.drawable.ic_room_small, it.room.name) } })
         when {
             session == null -> InfoCard { Body(R.string.results_no_room) }
             evaluation == null || clarity == null -> InfoCard { Body(R.string.results_working) }
@@ -269,31 +271,27 @@ private fun RemeasureCard(onEvent: (UiEvent) -> Unit) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ClarityViewsCard(evaluation: Evaluation, clarity: RoomClarity, selected: SeatId, onSeatSelected: (SeatId) -> Unit) {
     var view by rememberSaveable { mutableIntStateOf(0) }
     val views = listOf(R.string.results_view_3d, R.string.results_view_map, R.string.results_view_causes)
     val room = evaluation.session.room
     InfoCard {
-        SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-            views.forEachIndexed { index, label ->
-                SegmentedButton(
-                    selected = index == view,
-                    onClick = { view = index },
-                    shape = SegmentedButtonDefaults.itemShape(index, views.size),
-                    label = { Text(stringResource(label)) },
-                )
-            }
-        }
+        PillToggle(views.map { stringResource(it) }, view, onSelect = { view = it })
         when (view) {
             0 -> {
-                val description = stringResource(
-                    R.string.results_3d_description,
+                val picked = clarity.at(selected)
+                val pickedRange = rangeText(picked.band, picked.stiLow, picked.stiHigh)
+                val description = stringResource(R.string.results_3d_accessibility,
                     stringResource(StiBand.from(clarity.frontRowSti).labelRes()),
                     stringResource(StiBand.from(clarity.backRowSti).labelRes()),
-                )
-                ClarityRoom3D(room, clarity, description)
+                    seatLabel(selected), pickedRange)
+                val callout = DeskCallout(selected, stringResource(
+                    R.string.results_3d_callout,
+                    seatLabel(selected),
+                    pickedRange,
+                ))
+                ClassroomClarity3D(room, clarity, callout, description)
                 BandLegend()
                 Text(stringResource(R.string.results_3d_caption), style = MaterialTheme.typography.bodySmall)
             }

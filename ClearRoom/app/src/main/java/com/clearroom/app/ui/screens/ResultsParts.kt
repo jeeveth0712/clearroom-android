@@ -1,5 +1,31 @@
 package com.clearroom.app.ui.screens
 
+import com.clearroom.app.ui.theme.Lime
+import com.clearroom.app.ui.theme.Ink
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.annotation.DrawableRes
 import android.content.res.Resources
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -43,14 +69,204 @@ import com.clearroom.app.viz.decimals
 // Pieces every tab shares: the screen header, cards, the hero card, the band-with-range line, the
 // band legend, and the plain-word names of bands and causes (NFR-2).
 
-/** A tab's title and one-line introduction. */
+/**
+ * A tab's big title, with [action] (a lime pill or a chip) at the right and [subtitle] under it.
+ * The introduction ([intro]) shows only while the tab has nothing else to show: once there are
+ * results, they speak for themselves.
+ */
 @Composable
-internal fun ScreenHeader(tab: AppTab, @StringRes intro: Int) {
-    Column(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(stringResource(tab.labelRes), style = MaterialTheme.typography.headlineMedium)
-        Text(stringResource(intro), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+internal fun ScreenHeader(
+    tab: AppTab,
+    @StringRes intro: Int? = null,
+    subtitle: (@Composable () -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
+) {
+    Column(Modifier.padding(top = 8.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(tab.titleRes), style = MaterialTheme.typography.headlineLarge, modifier = Modifier.weight(1f))
+            action?.invoke()
+        }
+        subtitle?.invoke()
+        intro?.let { Text(stringResource(it), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
 }
+
+/** A small rounded tag in the header: the open room, or the date of what is shown. */
+@Composable
+internal fun InfoChip(@DrawableRes icon: Int, text: String, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .widthIn(max = CHIP_MAX_WIDTH)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(text, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** The header's action: a lime pill with ink text in both themes ("Edit room", "Stop"). */
+@Composable
+internal fun ActionPill(@DrawableRes icon: Int, @StringRes label: Int, onClick: () -> Unit, enabled: Boolean = true) {
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = Lime,
+            contentColor = Ink,
+            disabledContainerColor = Lime.copy(alpha = 0.4f),
+            disabledContentColor = Ink.copy(alpha = 0.6f),
+        ),
+    ) {
+        Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(stringResource(label), style = MaterialTheme.typography.labelLarge)
+    }
+}
+
+/**
+ * Two or three views of the same thing, as a lime pill in a grey track ("3D room | Seat map |
+ * Causes"). Each option is a tab for TalkBack and tests, named by its visible text.
+ */
+@Composable
+internal fun PillToggle(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .selectableGroup()
+            .padding(4.dp),
+    ) {
+        options.forEachIndexed { index, option ->
+            val isSelected = index == selected
+            Box(
+                Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(if (isSelected) Lime else Color.Transparent)
+                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onSelect(index) })
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    option,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (isSelected) Ink else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * A full-width pill for the screen's main next step ("View seat details"): ink by day, an
+ * outlined dark pill at night. [strong] = false gives a quieter outlined one for a second action.
+ */
+@Composable
+internal fun WideButton(label: String, onClick: () -> Unit, enabled: Boolean = true, strong: Boolean = true, chevron: Boolean = false) {
+    val brand = ClearRoomTheme.brand
+    val modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+    val content: @Composable RowScope.() -> Unit = {
+        Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f, fill = false))
+        if (chevron) {
+            Spacer(Modifier.width(8.dp))
+            Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, modifier = Modifier.size(20.dp))
+        }
+    }
+    if (strong) {
+        Button(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = modifier,
+            shape = CircleShape,
+            border = brand.strongButtonBorder?.let { BorderStroke(1.dp, it) },
+            colors = ButtonDefaults.buttonColors(containerColor = brand.strongButton, contentColor = brand.onStrongButton),
+            content = content,
+        )
+    } else {
+        OutlinedButton(onClick = onClick, enabled = enabled, modifier = modifier, shape = CircleShape, content = content)
+    }
+}
+
+/** A labelled number in a small outlined box: "Length / 6 m", "Echo / 1.1 → 0.8 s". */
+@Composable
+internal fun StatTile(label: String, value: String, modifier: Modifier = Modifier, detail: String? = null) {
+    Column(
+        modifier
+            .clip(MaterialTheme.shapes.small)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleMedium)
+        detail?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+/** The four clarity bands as coloured bars with their names and score ranges: the key to every clarity colour. */
+@Composable
+internal fun BandScale(modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        StiBand.entries.forEach { band ->
+            Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Box(Modifier.fillMaxWidth().height(10.dp).background(band.color(), CircleShape))
+                Text(stringResource(band.labelRes()), style = MaterialTheme.typography.labelLarge)
+                Text(bandBoundsText(band), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+}
+
+/** "< 0.45", "0.45–0.60", "≥ 0.75": where a band starts and ends on the 0–1 scale. */
+@Composable
+internal fun bandBoundsText(band: StiBand): String {
+    val next = StiBand.entries.getOrNull(band.ordinal + 1)
+    return when {
+        next == null -> stringResource(R.string.band_bounds_from, decimals(band.lowerBound, 2))
+        band.ordinal == 0 -> stringResource(R.string.band_bounds_below, decimals(next.lowerBound, 2))
+        else -> stringResource(R.string.band_bounds_between, decimals(band.lowerBound, 2), decimals(next.lowerBound, 2))
+    }
+}
+
+/** A band's name on its own colour, like a tag: readable on any card, unlike coloured text. */
+@Composable
+internal fun BandTag(band: StiBand, large: Boolean = false) {
+    Text(
+        stringResource(band.labelRes()),
+        style = if (large) MaterialTheme.typography.titleLarge else MaterialTheme.typography.labelLarge,
+        color = Ink,
+        modifier = Modifier
+            .clip(MaterialTheme.shapes.extraSmall)
+            .background(band.color())
+            .padding(horizontal = if (large) 12.dp else 8.dp, vertical = if (large) 2.dp else 1.dp),
+    )
+}
+
+/**
+ * The big number of a headline card, lime at night and ink by day. It shrinks to fit its width,
+ * so a range like "0.57–0.58" stays on one line on a small phone.
+ */
+@Composable
+internal fun HeadlineNumber(text: String, modifier: Modifier = Modifier, color: Color = ClearRoomTheme.brand.headline, maxSize: TextUnit = 44.sp) {
+    BasicText(
+        text,
+        modifier = modifier,
+        style = MaterialTheme.typography.displayMedium.copy(color = color),
+        maxLines = 1,
+        autoSize = TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = maxSize, stepSize = 1.sp),
+    )
+}
+
+private val CHIP_MAX_WIDTH = 190.dp
 
 /**
  * "Fair · 0.55–0.61" next to the band's colour: the verdict with its uncertainty range (NFR-10).

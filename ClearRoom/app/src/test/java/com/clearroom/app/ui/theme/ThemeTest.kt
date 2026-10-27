@@ -48,7 +48,7 @@ class ThemeTest {
     private fun brandPairs(brand: BrandColors) = mapOf(
         "hero card" to (brand.onHero to brand.hero),
         "hero button" to (brand.onHeroAccent to brand.heroAccent),
-        "selected tab" to (brand.onNavSelected to brand.navSelected),
+        "selected tab" to (brand.navSelected to brand.navBar),
         "other tabs" to (brand.onNavBar to brand.navBar),
     )
 

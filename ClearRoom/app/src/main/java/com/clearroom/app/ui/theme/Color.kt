@@ -16,9 +16,11 @@ internal val Lime = Color(0xFFD4F25C)
 
 private val Mist = Color(0xFFF2F3F5)
 private val Slate = Color(0xFF5B616B)
-private val NightBackground = Color(0xFF0C0E11)
-private val NightCard = Color(0xFF171A1F)
-private val NightRaised = Color(0xFF1E2228)
+/** The light hero card: lime washed out, so the page stays calm and ink text reads on it. */
+private val PaleLime = Color(0xFFE8F5BF)
+private val NightBackground = Color(0xFF111316)
+private val NightCard = Color(0xFF1B1E23)
+private val NightRaised = Color(0xFF24282E)
 private val NightText = Color(0xFFF2F3F5)
 private val NightMuted = Color(0xFFA4AAB4)
 
@@ -92,7 +94,8 @@ internal val DarkColors = darkColorScheme(
 
 /**
  * The colours Material's scheme has no role for: the one bold "hero" card per screen (the verdict,
- * like a balance card) and the floating navigation bar.
+ * like a balance card), the big numbers on ordinary cards, the strong full-width button, and the
+ * floating navigation bar.
  */
 @Immutable
 data class BrandColors(
@@ -100,32 +103,47 @@ data class BrandColors(
     val onHero: Color,
     val heroAccent: Color,
     val onHeroAccent: Color,
+    /** Big headline numbers on an ordinary card: lime at night, ink by day (lime on white can't be read). */
+    val headline: Color,
+    val strongButton: Color,
+    val onStrongButton: Color,
+    /** Null when the button is filled enough to need no edge. */
+    val strongButtonBorder: Color?,
     val navBar: Color,
+    val navBorder: Color?,
     val onNavBar: Color,
+    /** The open tab's icon and name. */
     val navSelected: Color,
-    val onNavSelected: Color,
 )
 
-/** Light: a black hero card with a lime button, and a black navigation pill. */
+/** Light: a pale lime hero card with ink text, ink buttons, and a black navigation pill. */
 internal val LightBrand = BrandColors(
-    hero = Ink,
-    onHero = Color.White,
-    heroAccent = Lime,
-    onHeroAccent = Ink,
+    hero = PaleLime,
+    onHero = Ink,
+    heroAccent = Ink,
+    onHeroAccent = Lime,
+    headline = Ink,
+    strongButton = Ink,
+    onStrongButton = Color.White,
+    strongButtonBorder = null,
     navBar = Ink,
+    navBorder = null,
     onNavBar = Color(0xFFB9BEC6),
     navSelected = Lime,
-    onNavSelected = Ink,
 )
 
-/** Dark: a lime hero card with an ink button, and a raised grey navigation pill. */
+/** Dark: a lime hero card, lime headline numbers, outlined buttons, and a dark navigation pill. */
 internal val DarkBrand = BrandColors(
     hero = Lime,
     onHero = Ink,
     heroAccent = Ink,
     onHeroAccent = Lime,
-    navBar = NightRaised,
+    headline = Lime,
+    strongButton = NightCard,
+    onStrongButton = NightText,
+    strongButtonBorder = Color(0xFF3A3F47),
+    navBar = NightCard,
+    navBorder = Color(0xFF2C3037),
     onNavBar = NightMuted,
     navSelected = Lime,
-    onNavSelected = Ink,
 )

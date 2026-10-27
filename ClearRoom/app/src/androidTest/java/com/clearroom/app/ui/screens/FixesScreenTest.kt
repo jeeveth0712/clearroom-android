@@ -63,6 +63,7 @@ class FixesScreenTest {
     @Test
     fun asMeasured_showsTheBackRowNowAndInvitesAChange() {
         show(sample)
+        compose.onNodeWithText(text(R.string.fixes_summary_title_now)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.fixes_summary_back_now, text(R.string.band_phrase_fair))).assertIsDisplayed()
         assertShown(text(R.string.fixes_summary_hint))
         compose.onNode(hasText(text(R.string.fixes_reset)) and hasClickAction()).performScrollTo().assertIsNotEnabled()
@@ -72,6 +73,7 @@ class FixesScreenTest {
     fun withCurtains_showsTheBackRowRisingAndOffersAReset() {
         val settings = FixSettings(curtainM2 = 40.0, microphone = true)
         show(sample, settings)
+        compose.onNodeWithText(text(R.string.fixes_summary_title)).assertIsDisplayed()
         compose.onNodeWithText(text(R.string.fixes_summary_back, text(R.string.band_phrase_fair), text(R.string.band_phrase_good))).assertIsDisplayed()
         compose.onNode(hasText(text(R.string.fixes_reset)) and hasClickAction()).performScrollTo().assertIsEnabled().performClick()
         assertEquals(UiEvent.ResetFixes, events.last())

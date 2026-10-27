@@ -20,6 +20,7 @@ val ClearRoomShapes = Shapes(
 )
 
 private val LocalBrandColors = staticCompositionLocalOf { LightBrand }
+private val LocalClassroomColors = staticCompositionLocalOf { LightClassroom }
 
 /**
  * ClearRoom's own colours, light or dark with the phone. The brand colours are fixed, never the
@@ -27,7 +28,10 @@ private val LocalBrandColors = staticCompositionLocalOf { LightBrand }
  */
 @Composable
 fun ClearRoomTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
-    CompositionLocalProvider(LocalBrandColors provides if (darkTheme) DarkBrand else LightBrand) {
+    CompositionLocalProvider(
+        LocalBrandColors provides if (darkTheme) DarkBrand else LightBrand,
+        LocalClassroomColors provides if (darkTheme) DarkClassroom else LightClassroom,
+    ) {
         MaterialTheme(
             colorScheme = if (darkTheme) DarkColors else LightColors,
             typography = Typography,
@@ -43,4 +47,10 @@ object ClearRoomTheme {
         @Composable
         @ReadOnlyComposable
         get() = LocalBrandColors.current
+
+    /** The 3D classroom's greys for the current light or dark theme. */
+    val classroom: ClassroomColors
+        @Composable
+        @ReadOnlyComposable
+        get() = LocalClassroomColors.current
 }

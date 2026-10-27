@@ -40,10 +40,14 @@ import com.clearroom.app.ui.FixesView
 import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.formatMetres
 import com.clearroom.app.viz.ClarityMorph3D
-import com.clearroom.app.viz.FixRankingChart
+import com.clearroom.app.viz.FixImprovementChart
+import com.clearroom.app.viz.FixRowWords
+import com.clearroom.app.viz.RowCompareChart
+import com.clearroom.app.viz.VoiceRowsChart
+import com.clearroom.app.viz.VoiceWords
+import com.clearroom.app.viz.rowComparison
+import com.clearroom.app.viz.voiceRows
 import com.clearroom.app.viz.VoiceAdvice
-import com.clearroom.app.viz.VoiceLevelNames
-import com.clearroom.app.viz.VoiceNeedChart
 import com.clearroom.app.viz.decimals
 import com.clearroom.app.viz.voiceAdvice
 import kotlin.math.roundToInt
@@ -72,17 +76,18 @@ fun FixesScreen(session: Session?, settings: FixSettings, view: FixesView?, onEv
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader(AppTab.FIXES, R.string.fixes_intro)
+        ScreenHeader(AppTab.FIXES, if (outcome == null) R.string.fixes_intro else null)
         when {
             session == null -> InfoCard { Body(R.string.results_no_room) }
             view == null -> InfoCard { Body(R.string.results_working) }
             outcome == null -> InfoCard { Body(R.string.fixes_needs_measurements) }
             else -> {
                 SummaryCard(outcome, settings)
-                MorphCard(view.session, outcome.after)
-                ControlsCard(view.session, settings, onEvent)
                 RankingCard(outcome)
-                VoiceCard(outcome)
+                ControlsCard(view.session, settings, onEvent)
+                RowComparisonCard(outcome)
+                MorphCard(view.session, outcome.after)
+                VoiceCard(outcome, settings.voiceChangeDb)
             }
         }
     }
@@ -93,7 +98,7 @@ private fun SummaryCard(outcome: FixesOutcome, settings: FixSettings) {
     val now = outcome.now.worstSeat(outcome.now.rows - 1)
     val after = outcome.after.worstSeat(outcome.after.rows - 1)
     HeroCard {
-        Text(stringResource(R.string.fixes_summary_title), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(if (settings.isAsMeasured) R.string.fixes_summary_title_now else R.string.fixes_summary_title), style = MaterialTheme.typography.titleMedium)
         if (settings.isAsMeasured) {
             Text(stringResource(R.string.fixes_summary_back_now, stringResource(now.band.phraseRes())), style = MaterialTheme.typography.titleLarge)
             BandRange(now.band, now.stiLow, now.stiHigh, large = true)
@@ -212,7 +217,13 @@ private fun RankingCard(outcome: FixesOutcome) {
         val values = ranking.map { stringResource(R.string.fixes_ranking_value, signedSti(it.gain), stringResource(it.preset.cost.textRes())) }
         val best = ranking.first()
         if (best.gain > 0.0) Text(stringResource(R.string.fixes_ranking_best, names.first(), signedSti(best.gain)), style = MaterialTheme.typography.titleSmall)
-        FixRankingChart(ranking, outcome.now.backRowSti, names, values)
+        FixImprovementChart(
+            ranking,
+            outcome.now.backRowSti,
+            ranking.mapIndexed { index, fix -> FixRowWords(names[index], stringResource(fix.preset.cost.textRes()), signedSti(fix.gain)) },
+            stringResource(R.string.fixes_chart_current),
+            stringResource(R.string.fixes_chart_axis),
+        )
         val backCause = outcome.now.worstSeat(outcome.now.rows - 1).cause
         if (backCause == Cause.ECHO) Text(stringResource(R.string.fixes_ranking_echo_note), style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.fixes_ranking_caption), style = MaterialTheme.typography.bodySmall)
@@ -220,7 +231,22 @@ private fun RankingCard(outcome: FixesOutcome) {
 }
 
 @Composable
-private fun VoiceCard(outcome: FixesOutcome) {
+private fun RowComparisonCard(outcome: FixesOutcome) {
+    if (outcome.now == outcome.after) return
+    val rows = rowComparison(outcome.now, outcome.after)
+    ChartCard(R.string.fixes_chart_row_compare) {
+        RowCompareChart(
+            rows,
+            rows.map { stringResource(R.string.fixes_chart_row, it.row + 1) },
+            rows.map { stringResource(R.string.fixes_chart_row_value,
+                rangeText(it.now.band, it.now.stiLow, it.now.stiHigh),
+                rangeText(it.after.band, it.after.stiLow, it.after.stiHigh)) },
+        )
+    }
+}
+
+@Composable
+private fun VoiceCard(outcome: FixesOutcome, voiceChangeDb: Double) {
     ChartCard(R.string.fixes_voice_title) {
         val back = outcome.voice.last().need
         val advice = voiceAdvice(back)
@@ -231,12 +257,22 @@ private fun VoiceCard(outcome: FixesOutcome) {
             }
             if (!outcome.after.voiceMeasured) append(' ').append(stringResource(R.string.fixes_voice_uncalibrated))
         }
-        VoiceNeedChart(
-            rows = outcome.voice,
-            levels = VoiceLevelNames(stringResource(R.string.fixes_voice_normal), stringResource(R.string.fixes_voice_raised), stringResource(R.string.fixes_voice_loud)),
-            xTitle = stringResource(R.string.chart_row),
-            yTitle = stringResource(R.string.chart_voice_needed_db),
-            description = caption,
+        val rows = voiceRows(outcome, voiceChangeDb)
+        VoiceRowsChart(
+            rows,
+            rows.map { stringResource(R.string.fixes_chart_row, it.row + 1) },
+            rows.map { row ->
+                val effort = when (row.advice) {
+                    VoiceAdvice.NORMAL_IS_ENOUGH -> R.string.fixes_voice_normal
+                    VoiceAdvice.RAISED -> R.string.fixes_voice_raised
+                    VoiceAdvice.LOUD, VoiceAdvice.BEYOND_LOUD -> R.string.fixes_voice_loud
+                    VoiceAdvice.UNREACHABLE -> R.string.fixes_chart_voice_unreachable
+                }
+                VoiceWords(stringResource(effort), row.neededDba?.let {
+                    stringResource(R.string.fixes_chart_voice_detail, decimals(it, 0))
+                } ?: stringResource(R.string.fixes_chart_voice_unreachable))
+            },
+            stringResource(R.string.fixes_chart_voice_axis),
         )
         Text(caption, style = MaterialTheme.typography.bodySmall)
     }

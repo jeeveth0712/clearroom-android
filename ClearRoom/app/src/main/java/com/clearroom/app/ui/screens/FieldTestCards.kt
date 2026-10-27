@@ -19,6 +19,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -33,6 +34,8 @@ import com.clearroom.app.data.Session
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.UiEvent
+import com.clearroom.app.viz.PredictionChart
+import com.clearroom.app.viz.PredictionWords
 import com.clearroom.app.ui.formatMetres
 import com.clearroom.app.viz.decimals
 import kotlin.math.roundToInt
@@ -44,8 +47,8 @@ import kotlin.math.roundToInt
 @Composable
 internal fun RepeatabilityLine(repeatability: Repeatability) {
     val percent = (repeatability.worstVariation * 100).roundToInt()
-    val text = if (repeatability.passed) R.string.field_repeat_ok else R.string.field_repeat_spread
-    Text(stringResource(text, repeatability.claps, percent), style = MaterialTheme.typography.bodyMedium)
+    val text = if (repeatability.passed) R.plurals.field_repeat_ok else R.plurals.field_repeat_spread
+    Text(pluralStringResource(text, repeatability.claps, repeatability.claps, percent), style = MaterialTheme.typography.bodyMedium)
 }
 
 /** Distance model: the voice recorded 3, 5 and 8 m away against the room model's prediction. */
@@ -113,6 +116,13 @@ internal fun CurtainCheckSection(before: Session, after: Session) {
     if (check == null) {
         Body(R.string.field_curtain_hint)
     } else {
+        PredictionChart(check, PredictionWords(
+            stringResource(R.string.field_prediction_before),
+            stringResource(R.string.field_prediction_predicted),
+            stringResource(R.string.field_prediction_measured),
+            stringResource(R.string.field_prediction_zone),
+            stringResource(R.string.field_prediction_axis),
+        ))
         Text(
             stringResource(R.string.field_curtain_row, decimals(check.beforeS, 2), decimals(check.predictedS, 2), decimals(check.measuredS, 2)),
             style = MaterialTheme.typography.bodyMedium,
@@ -142,7 +152,8 @@ internal fun ListeningScoreField(seat: SeatId, score: ListeningScore?, onScore: 
         label = { Text(stringResource(R.string.field_listening_field, ListeningScore.WORDS)) },
         singleLine = true,
         isError = !valid,
-        supportingText = { Text(stringResource(if (valid) R.string.field_listening_hint else R.string.field_listening_invalid, ListeningScore.WORDS)) },
+        supportingText = { Text(if (valid) pluralStringResource(R.plurals.field_listening_hint, ListeningScore.WORDS, ListeningScore.WORDS)
+            else stringResource(R.string.field_listening_invalid, ListeningScore.WORDS)) },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     )
 }
@@ -154,7 +165,8 @@ internal fun ListeningCheckCard(session: Session) {
     ChartCard(R.string.field_listening_title) {
         session.listening.forEach { score ->
             val sti = check?.seats?.firstOrNull { it.score == score }?.sti
-            val words = stringResource(R.string.field_listening_row, seatLabelOf(score.seat), score.wordsRight, ListeningScore.WORDS)
+            val words = pluralStringResource(R.plurals.field_listening_row, ListeningScore.WORDS,
+                seatLabelOf(score.seat), score.wordsRight, ListeningScore.WORDS)
             Text(if (sti == null) words else stringResource(R.string.field_listening_row_sti, words, decimals(sti, 2)), style = MaterialTheme.typography.bodyMedium)
         }
         when {

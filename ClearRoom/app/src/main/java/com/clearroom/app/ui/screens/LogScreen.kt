@@ -27,6 +27,7 @@ import com.clearroom.app.R
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.Session
 import com.clearroom.app.daylog.DayLogState
+import com.clearroom.app.daylog.DayVerdict
 import com.clearroom.app.daylog.LogSummary
 import com.clearroom.app.permission.MicAccess
 import com.clearroom.app.permission.rememberMicPermission
@@ -74,16 +75,19 @@ fun LogContent(
     onEvent: (UiEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val roomLog = view?.log?.takeIf { it.roomId == session?.room?.id }
     Column(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader(AppTab.LOG, R.string.log_intro)
+        ScreenHeader(AppTab.LOG, if (session == null) R.string.log_intro else null,
+            subtitle = { roomLog?.startMillis?.let { InfoChip(R.drawable.ic_calendar, clockTime(it)) } },
+            action = { if (roomLog?.running == true) ActionPill(R.drawable.ic_pause, R.string.log_stop, onClick = { onEvent(UiEvent.StopLog) }) })
         when {
             session == null -> InfoCard { Body(R.string.log_no_room) }
             session.room.id == SampleData.ROOM_ID -> InfoCard { Body(R.string.log_sample_room) }
             else -> {
-                val log = view?.log?.takeIf { it.roomId == session.room.id } ?: DayLogState(roomId = session.room.id)
+                val log = roomLog ?: DayLogState(roomId = session.room.id)
                 when (micAccess) {
                     MicAccess.NOT_ASKED -> MicAccessCard(R.string.mic_why, R.string.mic_allow, onAllowMic)
                     MicAccess.DENIED_CAN_ASK_AGAIN -> MicAccessCard(R.string.mic_denied_can_ask_again, R.string.mic_allow, onAllowMic)
@@ -124,10 +128,9 @@ private fun ControlCard(log: DayLogState, spot: String?, measureBusy: Boolean, l
             Text(stringResource(R.string.log_running, formatDuration(log.seconds.size * 1_000L)), style = MaterialTheme.typography.titleMedium)
             LevelBar(liveLevelDb)
             Body(R.string.log_how)
-            OutlinedButton(onClick = { onEvent(UiEvent.StopLog) }) { Text(stringResource(R.string.log_stop)) }
         } else {
             Body(R.string.log_how)
-            Button(onClick = { onEvent(UiEvent.StartLog) }, enabled = !measureBusy) { Text(stringResource(R.string.log_start)) }
+            ActionPill(R.drawable.ic_play, R.string.log_start, onClick = { onEvent(UiEvent.StartLog) }, enabled = !measureBusy)
         }
         if (!log.labelsAvailable) Body(R.string.log_no_labels)
         if (log.saveFailed) Body(R.string.log_save_failed)
@@ -159,7 +162,21 @@ private fun ClearLogsButton(onConfirm: () -> Unit) {
 
 @Composable
 private fun SummaryCard(summary: LogSummary, startMillis: Long) {
-    ChartCard(R.string.log_summary_title) {
+    HeroCard {
+        Text(stringResource(R.string.log_summary_title), style = MaterialTheme.typography.titleMedium)
+        val verdict = when (summary.dayVerdict) {
+            DayVerdict.CLEAR_THROUGHOUT -> R.string.log_day_clear
+            DayVerdict.MOSTLY_CLEAR -> R.string.log_day_mostly_clear
+            DayVerdict.OFTEN_UNCLEAR -> R.string.log_day_often_unclear
+            DayVerdict.MOSTLY_UNCLEAR -> R.string.log_day_mostly_unclear
+            null -> R.string.log_day_not_measured
+        }
+        Text(stringResource(verdict), style = MaterialTheme.typography.headlineMedium)
+        summary.backRowRange?.let { range ->
+            Text(stringResource(R.string.log_day_range, decimals(range.start, 2), decimals(range.endInclusive, 2)), style = MaterialTheme.typography.bodyMedium)
+        }
+        Text(stringResource(R.string.log_day_average, decimals(approxDba(summary.leqDba), 0)), style = MaterialTheme.typography.titleMedium)
+        Text(stringResource(R.string.log_day_duration, formatDuration(summary.spanMillis)), style = MaterialTheme.typography.bodyMedium)
         Text(stringResource(R.string.log_summary_started, clockTime(startMillis), formatDuration(summary.spanMillis)), style = MaterialTheme.typography.bodyMedium)
         Text(
             stringResource(R.string.log_summary_levels, decimals(approxDba(summary.leqDba), 0), decimals(approxDba(summary.l90Dba), 0)),
@@ -225,6 +242,9 @@ private fun EventsCard(summary: LogSummary) {
                     stringResource(R.string.log_event, time, stringResource(event.label.nameRes()), decimals(approxDba(event.maxDba), 0)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
+                summary.eventClarity[event]?.let { clarity ->
+                    Text(stringResource(R.string.log_event_clarity_change, signedSti(clarity.change)), style = MaterialTheme.typography.bodySmall)
+                }
             }
             Text(stringResource(R.string.log_events_latest, EVENTS_SHOWN), style = MaterialTheme.typography.bodySmall)
         }

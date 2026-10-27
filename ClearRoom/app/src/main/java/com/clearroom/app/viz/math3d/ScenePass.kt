@@ -7,8 +7,10 @@ class ScreenFace(val points: FloatArray, val color: Argb, val outlined: Boolean 
 
 class ScreenLine(val x1: Float, val y1: Float, val x2: Float, val y2: Float, val color: Argb)
 
-/** Where a label's centre lands on screen. */
-class ScreenLabel(val x: Float, val y: Float, val text: String)
+/** Where a label's centre lands on screen; a callout also has the spot it points at. */
+class ScreenLabel(val x: Float, val y: Float, val text: String, val pointerX: Float? = null, val pointerY: Float? = null) {
+    val isCallout: Boolean get() = pointerX != null && pointerY != null
+}
 
 /** One frame, in painting order: [ground], then [faces] far to near, then [lines], then [labels]. */
 class ScreenScene(val ground: List<ScreenFace>, val faces: List<ScreenFace>, val lines: List<ScreenLine>, val labels: List<ScreenLabel>)
@@ -50,7 +52,9 @@ object ScenePass {
             ScreenLine(a.first, a.second, b.first, b.second, line.color)
         }
         val labels = scene.labels.mapNotNull { label ->
-            projection.toScreen(view.transform(label.at))?.let { (x, y) -> ScreenLabel(x, y, label.text) }
+            val (x, y) = projection.toScreen(view.transform(label.at)) ?: return@mapNotNull null
+            val pointer = label.pointsAt?.let { projection.toScreen(view.transform(it)) }
+            ScreenLabel(x, y, label.text, pointer?.first, pointer?.second)
         }
         return ScreenScene(scene.ground.mapNotNull(::screenFace), farToNear, lines, labels)
     }

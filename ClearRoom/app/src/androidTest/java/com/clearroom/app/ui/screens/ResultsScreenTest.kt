@@ -86,10 +86,13 @@ class ResultsScreenTest {
 
     private val sample = SampleData.session
     private val sampleClarity = (ClarityModel.evaluate(sample) as ClarityResult.Ready).room
+    private val selectedSeat = sampleClarity.worstSeat(sampleClarity.rows - 1)
     private val sceneDescription = text(
-        R.string.results_3d_description,
+        R.string.results_3d_accessibility,
         text(StiBand.from(sampleClarity.frontRowSti).labelRes()),
         text(StiBand.from(sampleClarity.backRowSti).labelRes()),
+        text(R.string.seat_label, selectedSeat.seat.row + 1, selectedSeat.seat.col + 1),
+        rangeText(context.resources, selectedSeat.band, selectedSeat.stiLow, selectedSeat.stiHigh),
     )
     private val mapDescription = context.resources.getQuantityString(R.plurals.results_map_description, sampleClarity.seats.size, easySeatCount(sampleClarity), sampleClarity.seats.size)
 

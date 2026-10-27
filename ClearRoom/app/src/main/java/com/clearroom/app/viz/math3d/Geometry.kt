@@ -45,8 +45,11 @@ class Solid(val faces: List<Face3>) {
 
 class Line3(val from: Vec3, val to: Vec3, val color: Argb)
 
-/** Text pinned to a point in the scene; it turns with the scene and is drawn on top of everything. */
-class Label3(val at: Vec3, val text: String)
+/**
+ * Text pinned to a point in the scene; it turns with the scene and is drawn on top of everything.
+ * With [pointsAt] it is a callout: a highlighted bubble with a stem down to that spot.
+ */
+class Label3(val at: Vec3, val text: String, val pointsAt: Vec3? = null)
 
 /**
  * Everything one 3D view draws. [ground] is painted first, in list order: the room's walls and

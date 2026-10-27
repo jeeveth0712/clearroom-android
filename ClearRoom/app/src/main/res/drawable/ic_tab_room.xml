@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Tab icon on a 24 x 24 grid; tinted by NavigationBar. -->
+<!-- Tab icon on a 24 x 24 grid: a house. Tinted by the navigation bar. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
     android:height="24dp"
@@ -11,15 +11,5 @@
         android:strokeWidth="2"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M4,3h16v18h-16z" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FF000000"
-        android:strokeWidth="2"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M9,6.5h6" />
-    <path
-        android:fillColor="#FF000000"
-        android:pathData="M7,11h2.5v2.5h-2.5z M10.75,11h2.5v2.5h-2.5z M14.5,11h2.5v2.5h-2.5z M7,15.5h2.5v2.5h-2.5z M10.75,15.5h2.5v2.5h-2.5z M14.5,15.5h2.5v2.5h-2.5z" />
+        android:pathData="M3.5,10.5L12,3.5L20.5,10.5V20H14.5V14.5H9.5V20H3.5Z" />
 </vector>

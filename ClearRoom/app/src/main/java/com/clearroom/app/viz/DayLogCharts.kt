@@ -129,6 +129,11 @@ fun DrawScope.drawDayTimeline(summary: LogSummary, startMillis: Long, words: Tim
 
     inset(left = 0f, top = 0f, right = 0f, bottom = size.height - split) {
         val area = drawFrame(x, noiseAxis, emptyList(), noiseTicks, "", words.noiseTitle, style, text, minLeft = left)
+        summary.events.forEach { event ->
+            val from = area.px(event.startMillis.toDouble()).coerceIn(area.left, area.right)
+            val to = area.px(event.endMillis.toDouble()).coerceIn(area.left, area.right)
+            if (to > from) drawRect(event.label.chartColor().copy(alpha = 0.12f), Offset(from, area.top), Size(to - from, area.bottom - area.top))
+        }
         // The background level: what's left with the events taken out.
         val background = area.py(approxDba(summary.l90Dba))
         drawLine(style.axis, Offset(area.left, background), Offset(area.right, background), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
@@ -153,6 +158,11 @@ fun DrawScope.drawDayTimeline(summary: LogSummary, startMillis: Long, words: Tim
         val area = drawFrame(x, stiAxis, xTicks, stiTicks, "", words.clarityTitle, style, text, minLeft = left)
         val good = area.py(ClarityModel.TARGET_STI)
         drawRect(StiBand.GOOD.color().copy(alpha = 0.18f), Offset(area.left, area.top), Size(area.right - area.left, good - area.top))
+        summary.events.forEach { event ->
+            val from = area.px(event.startMillis.toDouble()).coerceIn(area.left, area.right)
+            val to = area.px(event.endMillis.toDouble()).coerceIn(area.left, area.right)
+            if (to > from) drawRect(event.label.chartColor().copy(alpha = 0.10f), Offset(from, area.top), Size(to - from, area.bottom - area.top))
+        }
         if (summary.backRowSti.all { it == null }) {
             val note = text.measure(words.notMeasured, style.label, constraints = Constraints(maxWidth = (area.right - area.left).toInt().coerceAtLeast(1)))
             drawText(note, topLeft = Offset(area.left + gap, (area.top + area.bottom - note.size.height) / 2f))

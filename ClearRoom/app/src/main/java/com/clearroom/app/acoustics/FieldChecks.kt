@@ -18,6 +18,13 @@ data class CurtainCheck(val curtainM2: Double, val beforeS: Double, val predicte
     val predictedChangeS: Double get() = beforeS - predictedS
     val measuredChangeS: Double get() = beforeS - measuredS
 
+    /** Measured after-time interval that satisfies the field protocol's 25% change rule. */
+    val passZoneS: ClosedFloatingPointRange<Double>?
+        get() = predictedChangeS.takeIf { it > 0.0 }?.let { change ->
+            (beforeS - change / (1.0 - FieldChecks.CURTAIN_TOLERANCE)).coerceAtLeast(0.0)..
+                (beforeS - change / (1.0 + FieldChecks.CURTAIN_TOLERANCE)).coerceAtLeast(0.0)
+        }
+
     /** The doc's test: the predicted change within ±25 % of the measured one. */
     val passed: Boolean
         get() = measuredChangeS > 0.0 && abs(predictedChangeS - measuredChangeS) <= FieldChecks.CURTAIN_TOLERANCE * measuredChangeS

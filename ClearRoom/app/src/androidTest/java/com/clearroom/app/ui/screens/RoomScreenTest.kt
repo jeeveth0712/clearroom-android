@@ -54,6 +54,7 @@ class RoomScreenTest {
     @Test
     fun typingARoomName_sendsTheUpdatedForm() {
         show(RoomUiState(form = sampleForm))
+        scrollTo(text(R.string.room_field_name))
         compose.onNodeWithText(text(R.string.room_field_name)).performTextReplacement("Lab 2")
         assertEquals(UiEvent.RoomFormChanged(sampleForm.copy(name = "Lab 2")), events.last())
     }
@@ -107,6 +108,8 @@ class RoomScreenTest {
     fun aValidForm_showsTheFloorPlan_andAnIncompleteOneExplainsWhy() {
         show(RoomUiState(form = sampleForm))
         val resources = InstrumentationRegistry.getInstrumentation().targetContext.resources
+        val picture = text(R.string.room_hero_picture, SampleData.room.name, SampleData.room.rows, SampleData.room.cols)
+        compose.onNode(hasContentDescription(picture)).assertIsDisplayed()
         val description = text(
             R.string.room_plan_description,
             "7",

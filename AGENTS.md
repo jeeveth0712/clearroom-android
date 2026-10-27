@@ -4,7 +4,7 @@ Read this first. It is the complete handover: what the project is, how the owner
 done, where everything is, what has been built, what is decided, what is still open, and the traps
 already hit. It is kept in the repository so it works from any account or tool.
 
-- **Last updated:** 2026-10-27, after milestone **M12** (commit `b7291bf`).
+- **Last updated:** 2026-10-27, after the M13 tools and the UI concept 03/05 follow-up.
 - **Next step:** M13 fieldwork: the owner runs `docs/ClearRoom-Field-Tests.md` in 3–4 rooms (section 9). The self-test and field-test tools are built.
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
@@ -62,6 +62,8 @@ assignment_ed5518/                      git root (this repo)
 ├── docs/ClearRoom-Setup-and-Build-Plan.md               setup guide, milestones M1–M13 with ticks
 ├── docs/ClearRoom-Audit-M12.md         the M12 bug and security audit (findings, tools, what wasn't run)
 ├── docs/ClearRoom-Field-Tests.md       the M13 field protocol and results table (the owner fills it in)
+├── docs/ClearRoom-Demo-Video.md        the 58-second script, shot list, and recording preparation
+├── dist/ClearRoom-latest.apk           signed release APK for submission (details and checksum in dist/)
 ├── .claude/skills/<name>/SKILL.md      12 project guides; any agent can read them as docs
 ├── .mcp.json                           Semgrep + Context7 MCP config
 ├── tools/                              helper scripts (section 13)
@@ -74,6 +76,8 @@ assignment_ed5518/                      git root (this repo)
 ```
 
 Skills (each `SKILL.md` is a focused how-to with the project's rules):
+Codex versions live in `.agents/skills/<name>/SKILL.md`; the original Claude versions remain in `.claude/skills/<name>/SKILL.md`. Use the Codex version in Codex sessions and check this file for current project status.
+
 - `clearroom-android-foundation`: architecture, packages, ViewModel and state rules
 - `android-audio-capture`: AudioRecord, sources, effects off, level meter, privacy
 - `acoustics-dsp`: biquads, octave bank, clap → RT60, Schroeder, quality checks
@@ -349,7 +353,9 @@ All 15 views are built.
 
 **Next for M13:** the owner runs the protocol in 3–4 rooms and fills in the table. Then copy the results into the requirements doc's Implementation notes, and tick M13 in the plan. Help with anything that turns up, but don't script the fieldwork.
 
-- The phone currently has the **release** build installed (with the self-test); `installDebug` replaces it (same key, rooms kept).
+**UI follow-up after M13 tools:** `ui-concepts/03-calm-classroom-dark.png` and `05-fixes-log-visualizations-dark.png` informed the redesign. Room previews a desk-and-board classroom in 3D; Results V8 colours desk tops by real seat clarity and calls out the selected seat; Fixes shows ranked score dots, row comparison and voice needed by row; Log adds a plain-word day summary and event spans across its timeline. The curtain field check plots the measured result against the protocol's 25% pass interval. Actual dark-mode phone screenshots are in `ui-concepts/implemented-dark-*.png`. `docs/ClearRoom-Demo-Video.md` has the one-minute script and shot list. These changes do **not** complete M13 fieldwork; the owner still runs the 3–4-room protocol.
+
+- The phone currently has the **latest release** build installed (with the UI redesign and self-test); `installDebug` replaces it (same key, rooms kept). The submission APK is `dist/ClearRoom-latest.apk`, SHA-256 `3B6BF1939A8A17ED63C966317F9A3E9E548F9BBB5CFF14D2AAD9E579B56BAB05`.
 - Before the video, remind the owner not to screen-record with the phone's microphone on.
 
 **The look (M12, owner's decisions):** inspired by the Dribbble shot "Crypto Trading Mobile App" (dribbble.com/shots/25559085). Dribbble blocks automated fetching and the owner hasn't sent a screenshot yet; if one comes, tune the look to it.
@@ -367,7 +373,7 @@ All 15 views are built.
 2. **Distance model:** **classical Sabine field, built.** Barron's revised theory would make back rows a little worse; it was offered and the owner hasn't answered.
 3. **Fix costs in ₹:** the doc wants ₹ prices on V6. **The app shows free / low / medium cost** until the owner gives prices (for 20 m² of heavy curtains and a portable mic set).
 4. **Soft-board absorption:** there is no sourced α table, so **soft boards are left out** of the fixes. The same applies to tile, glass and wood (plan Part E #6). Surface tags aren't used by the engine, because the Sabine fit uses measured RT60.
-5. **Predicted vs measured change (testing table, "what-if realism"):** not built. The app shows before and after, but doesn't yet compare the measured change with the Fixes tab's prediction. Planned for the M13 curtain test.
+5. **Predicted vs measured change (testing table, "what-if realism"):** built in the before/after card for curtains hung, including a plot of before, predicted, measured and the 25% field-test pass interval. Real-room field results are still pending.
 6. **Screen-off day logging (NFR-9):** **not built.** The screen stays on while a log runs (plan Part E, decision 3). Logging with the screen off needs a microphone foreground service and its notification; offer it only if the owner asks.
 7. Settled already:
    - noise snapshot 30 s;
@@ -385,7 +391,7 @@ All 15 views are built.
 
 ## 11. Testing
 
-**Current counts:** 573 JVM tests, 146 device tests, lint 0 issues. All pass at the M13 part 1 commit.
+**Current counts:** 582 JVM tests, 146 device tests, lint 0 issues. The concept 03/05 changes pass the full gate; M13 fieldwork remains open.
 M12 added `ThemeTest` (contrast and band-hue rules for both themes), `BackupRulesTest` and `PermissionsTest` (no INTERNET). M13 added `SelfTestTest`, `SelfTestStateTest` and `FieldChecksTest`.
 
 **Conventions:**
@@ -483,6 +489,6 @@ Other tools:
 ## 14. Resuming: checklist
 
 1. `git pull`; read this file, then the requirements doc's Implementation notes, then the skill for the next milestone.
-2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 573 JVM + 146 device tests.
+2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 582 JVM + 146 device tests.
 3. Tell the owner what you're about to build, and which third-party tools it needs.
 4. Follow the milestone loop (section 2). At the end, update this file's "Last updated" line, sections 8–11 and the commit table.

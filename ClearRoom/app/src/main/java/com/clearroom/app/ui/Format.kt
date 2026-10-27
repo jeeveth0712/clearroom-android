@@ -20,3 +20,11 @@ fun Double.formatMetres(): String {
 /** A moment as the phone shows dates, e.g. "27 Oct 2026, 14:30", in [zone]. */
 fun formatDateTime(millis: Long, zone: ZoneId = ZoneId.systemDefault(), locale: Locale = Locale.getDefault()): String =
     DateTimeFormatter.ofLocalizedDateTime(FormatStyle.MEDIUM, FormatStyle.SHORT).withLocale(locale).withZone(zone).format(Instant.ofEpochMilli(millis))
+
+/** A length of time split for "1 h 24 min": whole hours, then the minutes and seconds left over. */
+data class DurationParts(val hours: Long, val minutes: Int, val seconds: Int)
+
+fun durationParts(millis: Long): DurationParts {
+    val totalS = (millis / 1_000).coerceAtLeast(0)
+    return DurationParts(totalS / 3_600, (totalS % 3_600 / 60).toInt(), (totalS % 60).toInt())
+}

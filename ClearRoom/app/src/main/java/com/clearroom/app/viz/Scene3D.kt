@@ -36,6 +36,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import com.clearroom.app.ui.theme.Ink
+import com.clearroom.app.ui.theme.Lime
 import com.clearroom.app.ui.theme.SceneColors
 import com.clearroom.app.viz.math3d.Argb
 import com.clearroom.app.viz.math3d.OrbitCamera
@@ -73,7 +75,12 @@ fun Scene3D(
     var camera by remember(home) { mutableStateOf(home) }
     val path = remember { Path() }
     val measurer = rememberTextMeasurer()
-    val labels = LabelPaint(measurer, MaterialTheme.typography.labelMedium.copy(color = labelText), labelBackground)
+    val labels = LabelPaint(
+        measurer,
+        MaterialTheme.typography.labelMedium.copy(color = labelText),
+        labelBackground,
+        MaterialTheme.typography.titleSmall.copy(color = Ink),
+    )
     Canvas(
         modifier
             .pointerInput(home) {
@@ -131,7 +138,7 @@ fun FramedScene3D(geometry: SceneGeometry, home: OrbitCamera, description: Strin
 /** A Compose colour as the 3D maths' packed ARGB. */
 internal fun Color.argb(): Argb = Argb(toArgb())
 
-private class LabelPaint(val measurer: TextMeasurer, val style: TextStyle, val background: Color)
+private class LabelPaint(val measurer: TextMeasurer, val style: TextStyle, val background: Color, val calloutStyle: TextStyle)
 
 private fun DrawScope.drawScene(geometry: SceneGeometry, camera: OrbitCamera, path: Path, labels: LabelPaint) {
     val frame = ScenePass.project(geometry, camera, size.width, size.height)
@@ -157,9 +164,13 @@ private fun DrawScope.drawFace(face: ScreenFace, path: Path, edge: Stroke) {
 
 /** The label's text centred on its point, on a rounded pill so it reads over any colour. */
 private fun DrawScope.drawLabel(label: ScreenLabel, paint: LabelPaint) {
+    if (label.isCallout) return drawCallout(label, paint)
     val text = paint.measurer.measure(label.text, paint.style)
     val padding = Offset(6.dp.toPx(), 2.dp.toPx())
-    val textTopLeft = Offset(label.x - text.size.width / 2f, label.y - text.size.height / 2f)
+    val textTopLeft = Offset(
+        clampedLabelStart(label.x, text.size.width.toFloat(), size.width, padding.x),
+        clampedLabelStart(label.y, text.size.height.toFloat(), size.height, padding.y),
+    )
     drawRoundRect(
         color = paint.background,
         topLeft = textTopLeft - padding,
@@ -168,3 +179,29 @@ private fun DrawScope.drawLabel(label: ScreenLabel, paint: LabelPaint) {
     )
     drawText(text, topLeft = textTopLeft)
 }
+
+/** A callout: a lime bubble with ink text, and a stem down to an ink dot on the spot it names. */
+private fun DrawScope.drawCallout(label: ScreenLabel, paint: LabelPaint) {
+    val spot = Offset(requireNotNull(label.pointerX), requireNotNull(label.pointerY))
+    val text = paint.measurer.measure(label.text, paint.calloutStyle)
+    val padding = Offset(10.dp.toPx(), 5.dp.toPx())
+    val topLeft = Offset(
+        clampedLabelStart(label.x, text.size.width.toFloat(), size.width, padding.x),
+        clampedLabelStart(label.y, text.size.height.toFloat(), size.height, padding.y),
+    )
+    val centre = topLeft + Offset(text.size.width / 2f, text.size.height / 2f)
+    drawLine(Ink, spot, centre, 2.dp.toPx())
+    drawRoundRect(
+        color = Lime,
+        topLeft = topLeft - padding,
+        size = Size(text.size.width + 2 * padding.x, text.size.height + 2 * padding.y),
+        cornerRadius = CornerRadius(text.size.height / 2f + padding.y),
+    )
+    drawText(text, topLeft = topLeft)
+    drawCircle(Color.White, 6.dp.toPx(), spot)
+    drawCircle(Ink, 4.dp.toPx(), spot)
+}
+
+/** Keep the background and text of a scene label inside the visible canvas. */
+internal fun clampedLabelStart(centre: Float, content: Float, frame: Float, padding: Float): Float =
+    (centre - content / 2f).coerceIn(padding, maxOf(padding, frame - content - padding))

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -26,6 +27,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
@@ -51,18 +53,28 @@ import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.formatMetres
 import com.clearroom.app.ui.theme.ClearRoomTheme
 import com.clearroom.app.viz.RoomPlan
+import com.clearroom.app.viz.ClassroomPicture3D
+import kotlinx.coroutines.launch
 
 /** Room tab (FR-1): describe the room, see its floor plan, and switch between saved rooms. */
 @Composable
 fun RoomScreen(state: RoomUiState, onEvent: (UiEvent) -> Unit, modifier: Modifier = Modifier) {
     var pendingDelete by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
+        state = listState,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { ScreenHeader(AppTab.ROOM, R.string.room_intro) }
+        item {
+            ScreenHeader(AppTab.ROOM, action = {
+                ActionPill(R.drawable.ic_edit, R.string.room_edit_action, onClick = { scope.launch { listState.animateScrollToItem(3) } })
+            })
+        }
+        item { RoomOverview(state.form) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onEvent(UiEvent.NewRoom) }) { Text(stringResource(R.string.room_new)) }
@@ -87,6 +99,26 @@ fun RoomScreen(state: RoomUiState, onEvent: (UiEvent) -> Unit, modifier: Modifie
             },
             dismissButton = { TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.room_delete_cancel)) } },
         )
+    }
+}
+
+/** Live room preview: only valid dimensions reach the 3D scene while the form is being edited. */
+@Composable
+private fun RoomOverview(form: RoomForm) {
+    val room = (form.toRoom("preview") as? RoomForm.Result.Valid)?.room
+    if (room == null) {
+        InfoCard { Body(R.string.room_intro) }
+        return
+    }
+    InfoCard {
+        Text(room.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        ClassroomPicture3D(room, stringResource(R.string.room_hero_picture, room.name, room.rows, room.cols))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(stringResource(R.string.room_hero_size), stringResource(R.string.room_hero_size_value,
+                room.lengthM.formatMetres(), room.widthM.formatMetres(), room.heightM.formatMetres()), Modifier.weight(2f))
+            StatTile(stringResource(R.string.room_hero_rows), room.rows.toString(), Modifier.weight(1f))
+            StatTile(stringResource(R.string.room_hero_seats), (room.rows * room.cols).toString(), Modifier.weight(1f))
+        }
     }
 }
 

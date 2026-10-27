@@ -76,6 +76,23 @@ class LogStatsTest {
         assertEquals(t0 + 20_000L, line.last().timeMillis)
     }
 
+    @Test
+    fun `long logs use one-minute noise points`() {
+        assertEquals(10_000L, LogStats.noiseStepMillisFor(30 * 60_000L))
+        assertEquals(60_000L, LogStats.noiseStepMillisFor(31 * 60_000L))
+    }
+
+    @Test
+    fun `day verdict and displayed range come from measured periods only`() {
+        val periods = (0 until 4).map { periodLike(flatBands(-60.0)).copy(startMillis = t0 + it * 60_000L) }
+        val clear = LogSummary(240_000L, -60.0, -60.0, periods, listOf(0.65, 0.68, 0.61, 0.58), emptyList(), emptyList())
+        assertEquals(DayVerdict.MOSTLY_CLEAR, clear.dayVerdict)
+        assertEquals(0.58, assertNotNull(clear.backRowRange).start)
+        assertEquals(0.68, assertNotNull(clear.backRowRange).endInclusive)
+        assertEquals(1, clear.periodsBelowTarget)
+        assertEquals(null, clear.copy(backRowSti = List(4) { null }).dayVerdict)
+    }
+
     // --- Events ----------------------------------------------------------------------------------------
 
     @Test

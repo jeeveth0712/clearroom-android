@@ -165,8 +165,7 @@
     <string name="results_missing_echo">• Echo: a clap test at one seat or more</string>
     <string name="results_missing_noise">• Background noise at one seat or more</string>
     <string name="results_working">Working out the clarity…</string>
-    <string name="results_3d_caption">Each bar is a seat: taller and bluer means clearer. The cone is the speaker. Drag to turn the room, pinch to zoom, double-tap to reset.</string>
-    <string name="results_3d_description">3D view of the room. Front row: %1$s. Back row: %2$s.</string>
+    <string name="results_3d_caption">Each desk top shows the clarity at that seat. The cone marks the speaker. Drag to turn the room, pinch to zoom, double-tap to reset.</string>
     <string name="results_3d_label_speaker">Speaker</string>
     <string name="results_3d_label_back">Back</string>
     <string name="results_uncalibrated">No voice reference yet, so a typical voice is assumed (uncalibrated). Record the voice on the Measure tab for your own result.</string>
@@ -295,7 +294,7 @@
     <string name="fixes_ranking_value">%1$s · %2$s</string>
     <string name="fixes_ranking_best">Best: %1$s (%2$s)</string>
     <string name="fixes_ranking_echo_note">Echo is what limits the back row here, so a louder voice, a microphone or standing closer barely helps: they make the voice louder, not the echo shorter.</string>
-    <string name="fixes_ranking_caption">Each bar shows how much one change on its own lifts the back row’s score (0 to 1); whiskers show the uncertainty. Costs are rough guides.</string>
+    <string name="fixes_ranking_caption">Each dot shows the predicted back-row score after one change; whiskers show the range from the claps. Costs are rough guides.</string>
     <string name="fix_curtains">Hang 20 m² of heavy curtains</string>
     <string name="fix_fans_off">Switch the fans and AC off</string>
     <string name="fix_microphone">Use a portable microphone</string>
@@ -407,8 +406,14 @@
     <!-- Field tests the app works out (doc testing table, M13) -->
     <string name="measure_clap_more">Another clap (%1$d so far)</string>
     <!-- %1$d claps, %2$d the largest spread in per cent -->
-    <string name="field_repeat_ok">Repeatable: these %1$d claps agree within %2$d%% at speech pitches (the field test asks for 10%% or less).</string>
-    <string name="field_repeat_spread">These %1$d claps spread %2$d%% at speech pitches, more than the 10%% the field test allows. Clap again, the same way each time.</string>
+    <plurals name="field_repeat_ok">
+        <item quantity="one">Repeatable: this %1$d clap agrees within %2$d%% at speech pitches (the field test asks for 10%% or less).</item>
+        <item quantity="other">Repeatable: these %1$d claps agree within %2$d%% at speech pitches (the field test asks for 10%% or less).</item>
+    </plurals>
+    <plurals name="field_repeat_spread">
+        <item quantity="one">This %1$d clap spreads %2$d%% at speech pitches, more than the 10%% the field test allows. Clap again, the same way each time.</item>
+        <item quantity="other">These %1$d claps spread %2$d%% at speech pitches, more than the 10%% the field test allows. Clap again, the same way each time.</item>
+    </plurals>
     <string name="field_distance_title">Field test: voice by distance</string>
     <string name="field_distance_hint">With the voice recorded at 1 m above, hold the phone 3, 5 and 8 m from the speaker, straight ahead, and record the same paragraph at each. The app compares each recording with what its room model predicts there.</string>
     <!-- %1$s distance in m -->
@@ -433,10 +438,16 @@
     <string name="field_listening_title">Field test: listening check</string>
     <!-- %1$d words -->
     <string name="field_listening_field">Words written down right, of %1$d</string>
-    <string name="field_listening_hint">Read %1$d short words from the front; enter how many a listener here got right.</string>
+    <plurals name="field_listening_hint">
+        <item quantity="one">Read %1$d short word from the front; enter how many a listener here got right.</item>
+        <item quantity="other">Read %1$d short words from the front; enter how many a listener here got right.</item>
+    </plurals>
     <string name="field_listening_invalid">Enter a number from 0 to %1$d.</string>
     <!-- %1$s seat, %2$d words right, %3$d words read -->
-    <string name="field_listening_row">%1$s: %2$d of %3$d words</string>
+    <plurals name="field_listening_row">
+        <item quantity="one">%1$s: %2$d of %3$d word</item>
+        <item quantity="other">%1$s: %2$d of %3$d words</item>
+    </plurals>
     <!-- %1$s field_listening_row, %2$s clarity score -->
     <string name="field_listening_row_sti">%1$s · clarity %2$s</string>
     <string name="field_listening_needs_two">Score a second seat to compare them with the app.</string>
@@ -530,8 +541,6 @@
     <string name="chart_noise">Noise</string>
     <string name="chart_masked_zone">Less than 15 dB above noise</string>
     <string name="chart_seconds">%1$d s</string>
-    <string name="chart_row">Row (1 = front)</string>
-    <string name="chart_voice_needed_db">Voice needed (dB above normal)</string>
 
     <!-- Band levels table -->
     <string name="levels_caption">dB relative to the phone\'s maximum. Only differences between readings matter.</string>
@@ -540,4 +549,44 @@
     <string name="problem_permission_revoked">Microphone access was turned off. Allow it again to measure.</string>
     <string name="problem_day_log_running">The day log is using the microphone. Stop it on the Log tab first.</string>
     <string name="problem_read_failed">The recording stopped unexpectedly. Please try again.</string>
+    <!-- Concept 03 and 05 screen and chart labels -->
+    <string name="title_room">Your room</string>
+    <string name="room_edit_action">Edit room</string>
+    <string name="room_hero_size">Room size</string>
+    <string name="room_hero_rows">Rows</string>
+    <string name="room_hero_seats">Seats</string>
+    <string name="room_hero_size_value">%1$s × %2$s × %3$s m</string>
+    <string name="room_hero_picture">3D picture of %1$s. Seating layout: %2$d × %3$d.</string>
+    <string name="title_measure">Measure</string>
+    <string name="title_results">Results</string>
+    <string name="title_fixes">Best changes</string>
+    <string name="title_log">Day log</string>
+    <string name="band_bounds_from">%1$s and above</string>
+    <string name="band_bounds_below">Below %1$s</string>
+    <string name="band_bounds_between">%1$s to %2$s</string>
+    <string name="fixes_chart_current">NOW</string>
+    <string name="fixes_summary_title_now">As measured</string>
+    <string name="fixes_chart_axis">Predicted back-row clarity (0–1)</string>
+    <string name="fixes_chart_row_compare">Clarity by row</string>
+    <string name="fixes_chart_row">Row %1$d</string>
+    <string name="fixes_chart_row_value">%1$s → %2$s</string>
+    <string name="fixes_chart_voice_axis">Approximate voice level at the seat (dBA)</string>
+    <string name="fixes_chart_voice_detail">%1$s dBA needed</string>
+    <string name="fixes_chart_voice_unreachable">Echo limit</string>
+    <string name="field_prediction_before">Before</string>
+    <string name="field_prediction_predicted">Predicted</string>
+    <string name="field_prediction_measured">Measured</string>
+    <string name="field_prediction_zone">Within 25% of measured change</string>
+    <string name="field_prediction_axis">Echo time at speech pitches (s)</string>
+    <string name="results_3d_callout">%1$s · %2$s</string>
+    <string name="results_3d_accessibility">3D classroom. Front row: %1$s. Back row: %2$s. Selected %3$s: %4$s.</string>
+    <string name="log_day_clear">Clear throughout</string>
+    <string name="log_day_mostly_clear">Mostly clear</string>
+    <string name="log_day_often_unclear">Often hard to follow</string>
+    <string name="log_day_mostly_unclear">Mostly hard to follow</string>
+    <string name="log_day_not_measured">Clarity not measured yet</string>
+    <string name="log_day_range">Back-row clarity range: %1$s–%2$s (0–1)</string>
+    <string name="log_day_average">Average noise, about %1$s dBA</string>
+    <string name="log_day_duration">Recorded for %1$s</string>
+    <string name="log_event_clarity_change">%1$s change in back-row clarity</string>
 </resources>
