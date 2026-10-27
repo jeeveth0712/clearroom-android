@@ -14,4 +14,4 @@
 
 Install with `adb install -r dist/ClearRoom-latest.apk` from the repository root. The same signature lets it replace the current debug or release app without clearing saved rooms.
 
-The current source passes 582 JVM tests, 146 on-phone tests, and Android lint with no issues. The one-minute demo script and shot list are in [docs/ClearRoom-Demo-Video.md](../docs/ClearRoom-Demo-Video.md). M13's real-room fieldwork is still the owner's next step.
+The current source passes 582 JVM tests, 146 on-phone tests, and Android lint with no issues. M13's real-room fieldwork is still the owner's next step.

@@ -62,7 +62,6 @@ assignment_ed5518/                      git root (this repo)
 ├── docs/ClearRoom-Setup-and-Build-Plan.md               setup guide, milestones M1–M13 with ticks
 ├── docs/ClearRoom-Audit-M12.md         the M12 bug and security audit (findings, tools, what wasn't run)
 ├── docs/ClearRoom-Field-Tests.md       the M13 field protocol and results table (the owner fills it in)
-├── docs/ClearRoom-Demo-Video.md        one-minute submission and two-minute presentation scripts, shots, and recording preparation
 ├── dist/ClearRoom-latest.apk           signed release APK for submission (details and checksum in dist/)
 ├── .claude/skills/<name>/SKILL.md      12 project guides; any agent can read them as docs
 ├── .mcp.json                           Semgrep + Context7 MCP config
@@ -353,7 +352,7 @@ All 15 views are built.
 
 **Next for M13:** the owner runs the protocol in 3–4 rooms and fills in the table. Then copy the results into the requirements doc's Implementation notes, and tick M13 in the plan. Help with anything that turns up, but don't script the fieldwork.
 
-**UI follow-up after M13 tools:** `ui-concepts/03-calm-classroom-dark.png` and `05-fixes-log-visualizations-dark.png` informed the redesign. Room previews a desk-and-board classroom in 3D; Results V8 colours desk tops by real seat clarity and calls out the selected seat; Fixes shows ranked score dots, row comparison and voice needed by row; Log adds a plain-word day summary and event spans across its timeline. The curtain field check plots the measured result against the protocol's 25% pass interval. Actual dark-mode phone screenshots are in `ui-concepts/implemented-dark-*.png`. `docs/ClearRoom-Demo-Video.md` has the one-minute submission and two-minute presentation scripts with shot lists. These changes do **not** complete M13 fieldwork; the owner still runs the 3–4-room protocol.
+**UI follow-up after M13 tools:** `ui-concepts/03-calm-classroom-dark.png` and `05-fixes-log-visualizations-dark.png` informed the redesign. Room previews a desk-and-board classroom in 3D; Results V8 colours desk tops by real seat clarity and calls out the selected seat; Fixes shows ranked score dots, row comparison and voice needed by row; Log adds a plain-word day summary and event spans across its timeline. The curtain field check plots the measured result against the protocol's 25% pass interval. Actual dark-mode phone screenshots are in `ui-concepts/implemented-dark-*.png`. These changes do **not** complete M13 fieldwork; the owner still runs the 3–4-room protocol.
 
 - The phone currently has the **latest release** build installed (with the UI redesign and self-test); `installDebug` replaces it (same key, rooms kept). The submission APK is `dist/ClearRoom-latest.apk`, SHA-256 `3B6BF1939A8A17ED63C966317F9A3E9E548F9BBB5CFF14D2AAD9E579B56BAB05`.
 - Before the video, remind the owner not to screen-record with the phone's microphone on.
