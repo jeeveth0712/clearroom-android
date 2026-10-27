@@ -102,8 +102,7 @@ fun ResultsScreen(session: Session?, evaluation: Evaluation?, report: ReportStat
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(AppTab.RESULTS.labelRes), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.results_intro), style = MaterialTheme.typography.bodyLarge)
+        ScreenHeader(AppTab.RESULTS, R.string.results_intro)
         when {
             session == null -> InfoCard { Body(R.string.results_no_room) }
             evaluation == null || clarity == null -> InfoCard { Body(R.string.results_working) }
@@ -158,10 +157,10 @@ private fun ReadyResults(evaluation: Evaluation, clarity: RoomClarity, report: R
 @Composable
 private fun VerdictCard(clarity: RoomClarity, report: ReportState, onEvent: (UiEvent) -> Unit) {
     val back = rowVerdict(clarity, clarity.rows - 1)
-    InfoCard {
+    HeroCard {
         val headline = if (clarity.rows > 1) R.string.results_verdict_back else R.string.results_verdict_all
         Text(stringResource(headline, stringResource(back.band.phraseRes())), style = MaterialTheme.typography.titleLarge)
-        BandRange(back.band, back.lowSti, back.highSti)
+        BandRange(back.band, back.lowSti, back.highSti, large = true)
         Text(stringResource(R.string.results_verdict_cause, stringResource(back.cause.nameRes())), style = MaterialTheme.typography.titleSmall)
         Body(back.cause.whyRes())
         if (clarity.rows > 1) {
@@ -172,9 +171,7 @@ private fun VerdictCard(clarity: RoomClarity, report: ReportState, onEvent: (UiE
             )
         }
         if (!clarity.voiceMeasured) Body(R.string.results_uncalibrated)
-        OutlinedButton(onClick = { onEvent(UiEvent.ShareReport) }, enabled = report != ReportState.Writing) {
-            Text(stringResource(R.string.results_share))
-        }
+        HeroButton(R.string.results_share, onClick = { onEvent(UiEvent.ShareReport) }, enabled = report != ReportState.Writing)
         when (report) {
             ReportState.Writing -> Text(stringResource(R.string.results_share_writing), style = MaterialTheme.typography.bodySmall)
             ReportState.Failed -> Text(stringResource(R.string.results_share_failed), style = MaterialTheme.typography.bodySmall)

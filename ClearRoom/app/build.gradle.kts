@@ -33,9 +33,14 @@ android {
 
     buildTypes {
         release {
+            // Owner's choice (M12): the assignment APK is signed with the Android debug key, so it
+            // installs on any phone with nothing secret to keep. Not for a store release.
+            signingConfig = signingConfigs.getByName("debug")
             optimization {
                 enable = true
-                packageScope = setOf("androidx.**", "kotlin.**", "kotlinx.**")
+                // The whole app is shrunk: the template's packageScope (androidx, kotlin, kotlinx only)
+                // built an APK that crashed on start (IllegalAccessError in a renamed Kotlin class).
+                keepRules { files.add(file("proguard-rules.pro")) }
             }
         }
         // On-phone tests install, run and then uninstall the app under test. A separate application
@@ -77,6 +82,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.mediapipe.tasks.audio)
+    constraints {
+        // MediaPipe's own picks have known flaws (see the version catalog): use the fixed releases.
+        implementation(libs.protobuf.javalite) { because("CVE-2024-7254 in 4.26.1") }
+        implementation(libs.guava) { because("CVE-2020-8908 and CVE-2023-2976 in 27.0.1") }
+    }
     testImplementation(libs.junit)
     testImplementation(libs.kotlin.test.junit)
     testImplementation(libs.kotlinx.coroutines.test)

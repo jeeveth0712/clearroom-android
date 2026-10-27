@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -63,10 +62,7 @@ fun RoomScreen(state: RoomUiState, onEvent: (UiEvent) -> Unit, modifier: Modifie
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item {
-            Text(stringResource(AppTab.ROOM.labelRes), style = MaterialTheme.typography.headlineSmall)
-            Text(stringResource(R.string.room_intro), style = MaterialTheme.typography.bodyLarge)
-        }
+        item { ScreenHeader(AppTab.ROOM, R.string.room_intro) }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = { onEvent(UiEvent.NewRoom) }) { Text(stringResource(R.string.room_new)) }
@@ -106,13 +102,13 @@ private fun RoomFormCard(state: RoomUiState, onEvent: (UiEvent) -> Unit) {
             change(form.copy(name = it))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FormField(R.string.room_field_length, form.lengthM, errorFor(RoomField.LENGTH), KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_length, form.lengthM, errorFor(RoomField.LENGTH), KeyboardType.Decimal, Modifier.weight(1f), unit = R.string.room_unit_metres) {
                 change(form.copy(lengthM = it))
             }
-            FormField(R.string.room_field_width, form.widthM, errorFor(RoomField.WIDTH), KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_width, form.widthM, errorFor(RoomField.WIDTH), KeyboardType.Decimal, Modifier.weight(1f), unit = R.string.room_unit_metres) {
                 change(form.copy(widthM = it))
             }
-            FormField(R.string.room_field_height, form.heightM, errorFor(RoomField.HEIGHT), KeyboardType.Decimal, Modifier.weight(1f)) {
+            FormField(R.string.room_field_height, form.heightM, errorFor(RoomField.HEIGHT), KeyboardType.Decimal, Modifier.weight(1f), unit = R.string.room_unit_metres) {
                 change(form.copy(heightM = it))
             }
         }
@@ -142,6 +138,8 @@ private fun FormField(
     error: String?,
     keyboard: KeyboardType,
     modifier: Modifier = Modifier,
+    // The unit after the number ("9 m") keeps the label short enough for three fields in a row.
+    @StringRes unit: Int? = null,
     onValueChange: (String) -> Unit,
 ) {
     OutlinedTextField(
@@ -149,6 +147,7 @@ private fun FormField(
         onValueChange = onValueChange,
         modifier = modifier.fillMaxWidth(),
         label = { Text(stringResource(label)) },
+        suffix = unit?.let { { Text(stringResource(it)) } },
         singleLine = true,
         isError = error != null,
         supportingText = error?.let { { Text(it) } },
@@ -241,14 +240,7 @@ private fun SavedRoomRow(summary: RoomSummary, isOpen: Boolean, onOpen: () -> Un
 }
 
 @Composable
-private fun SectionCard(@StringRes title: Int, content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(stringResource(title), style = MaterialTheme.typography.titleMedium)
-            content()
-        }
-    }
-}
+private fun SectionCard(@StringRes title: Int, content: @Composable ColumnScope.() -> Unit) = ChartCard(title, content)
 
 @StringRes
 private fun Material.nameRes(): Int = when (this) {

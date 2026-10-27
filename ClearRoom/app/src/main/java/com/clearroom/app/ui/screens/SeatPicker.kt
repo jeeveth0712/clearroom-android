@@ -79,7 +79,8 @@ private fun SeatCell(size: Dp, isMeasured: Boolean, isSelected: Boolean, descrip
             .background(if (isMeasured) colours.primaryContainer else colours.surfaceVariant)
             .border(
                 width = if (isSelected) 3.dp else 1.dp,
-                color = if (isSelected) colours.primary else colours.outlineVariant,
+                // onSurface, not the accent: at night a measured seat is lime too, and the ring must show on it.
+                color = if (isSelected) colours.onSurface else colours.outlineVariant,
                 shape = RoundedCornerShape(4.dp),
             )
             .clickable(onClick = onClick)

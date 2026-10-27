@@ -14,7 +14,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -32,18 +35,37 @@ import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
 import com.clearroom.app.acoustics.Cause
 import com.clearroom.app.acoustics.StiBand
+import com.clearroom.app.ui.AppTab
+import com.clearroom.app.ui.theme.ClearRoomTheme
 import com.clearroom.app.ui.theme.color
 import com.clearroom.app.viz.decimals
 
-// Pieces the Results and Fixes tabs share: cards, the band-with-range line, the band legend, and
-// the plain-word names of bands and causes (NFR-2).
+// Pieces every tab shares: the screen header, cards, the hero card, the band-with-range line, the
+// band legend, and the plain-word names of bands and causes (NFR-2).
 
-/** "Fair · 0.55–0.61" next to the band's colour: the verdict with its uncertainty range (NFR-10). */
+/** A tab's title and one-line introduction. */
 @Composable
-internal fun BandRange(band: StiBand, low: Double, high: Double) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.size(14.dp).background(band.color(), RoundedCornerShape(3.dp)))
-        Text(rangeText(band, low, high), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+internal fun ScreenHeader(tab: AppTab, @StringRes intro: Int) {
+    Column(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(stringResource(tab.labelRes), style = MaterialTheme.typography.headlineMedium)
+        Text(stringResource(intro), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/**
+ * "Fair · 0.55–0.61" next to the band's colour: the verdict with its uncertainty range (NFR-10).
+ * [large] is the hero card's headline number.
+ */
+@Composable
+internal fun BandRange(band: StiBand, low: Double, high: Double, large: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(if (large) 12.dp else 8.dp)) {
+        val swatch = if (large) 22.dp else 14.dp
+        Box(Modifier.size(swatch).background(band.color(), RoundedCornerShape(if (large) 6.dp else 3.dp)))
+        if (large) {
+            Text(rangeText(band, low, high), style = MaterialTheme.typography.headlineSmall)
+        } else {
+            Text(rangeText(band, low, high), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold)
+        }
     }
 }
 
@@ -115,11 +137,44 @@ internal fun ChartCard(@StringRes title: Int, content: @Composable ColumnScope.(
     }
 }
 
+/** The everyday card: white (dark grey at night) on the background, rounded, no shadow. */
 @Composable
 internal fun InfoCard(content: @Composable ColumnScope.() -> Unit) {
-    Card(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
     }
+}
+
+/**
+ * The one bold card on a screen, like a balance card: the verdict. Black with white text in the
+ * light theme, lime with black text in the dark one; text inside takes its colour automatically.
+ */
+@Composable
+internal fun HeroCard(content: @Composable ColumnScope.() -> Unit) {
+    val brand = ClearRoomTheme.brand
+    Card(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        colors = CardDefaults.cardColors(containerColor = brand.hero, contentColor = brand.onHero),
+    ) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+    }
+}
+
+/** The hero card's action: a pill in the accent that stands out on [HeroCard]. */
+@Composable
+internal fun HeroButton(@StringRes label: Int, onClick: () -> Unit, enabled: Boolean = true) {
+    val brand = ClearRoomTheme.brand
+    Button(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = brand.heroAccent,
+            contentColor = brand.onHeroAccent,
+            disabledContainerColor = brand.heroAccent.copy(alpha = 0.4f),
+            disabledContentColor = brand.onHeroAccent.copy(alpha = 0.6f),
+        ),
+    ) { Text(stringResource(label)) }
 }
 
 @Composable

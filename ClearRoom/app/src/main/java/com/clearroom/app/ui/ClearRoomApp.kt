@@ -1,10 +1,19 @@
 package com.clearroom.app.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,12 +23,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
 import com.clearroom.app.report.ReportSharing
 import com.clearroom.app.ui.screens.FixesScreen
@@ -84,17 +98,41 @@ private fun ShareReport(report: ReportState, onShown: () -> Unit) {
     }
 }
 
+/**
+ * The five tabs as a floating pill above the system navigation: black (raised grey at night) with
+ * the open tab in a lime pill. Each tab is one selectable item, so TalkBack reads "Results, tab,
+ * selected" from its visible label.
+ */
 @Composable
 private fun AppNavigationBar(selected: AppTab, onTabSelected: (AppTab) -> Unit) {
-    NavigationBar {
+    val brand = ClearRoomTheme.brand
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .clip(CircleShape)
+            .background(brand.navBar)
+            .selectableGroup()
+            .padding(6.dp),
+    ) {
         AppTab.entries.forEach { tab ->
-            NavigationBarItem(
-                selected = tab == selected,
-                onClick = { onTabSelected(tab) },
+            val isSelected = tab == selected
+            val content = if (isSelected) brand.onNavSelected else brand.onNavBar
+            Column(
+                Modifier
+                    .weight(1f)
+                    .clip(CircleShape)
+                    .background(if (isSelected) brand.navSelected else Color.Transparent)
+                    .selectable(selected = isSelected, role = Role.Tab, onClick = { onTabSelected(tab) })
+                    .padding(vertical = 8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
                 // The visible label already names the tab for TalkBack.
-                icon = { Icon(painterResource(tab.iconRes), contentDescription = null) },
-                label = { Text(stringResource(tab.labelRes)) },
-            )
+                Icon(painterResource(tab.iconRes), contentDescription = null, tint = content, modifier = Modifier.size(22.dp))
+                Text(stringResource(tab.labelRes), style = MaterialTheme.typography.labelSmall, color = content, maxLines = 1)
+            }
         }
     }
 }

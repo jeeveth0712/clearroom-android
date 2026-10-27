@@ -18,8 +18,14 @@ coroutines = "1.11.0"
 orgJson = "20260814"
 # MediaPipe Tasks Audio runs the YAMNet sound-label model on the phone (FR-9 day log).
 mediapipe = "1.1.1"
+# MediaPipe 1.1.1 brings protobuf-javalite 4.26.1 (CVE-2024-7254) and Guava 27.0.1 (CVE-2020-8908,
+# CVE-2023-2976). Neither flaw is reachable from ClearRoom (M12 audit), but the fixed releases cost nothing.
+protobufJavalite = "4.36.2"
+guava = "33.7.2-android"
 
 [libraries]
+protobuf-javalite = { group = "com.google.protobuf", name = "protobuf-javalite", version.ref = "protobufJavalite" }
+guava = { group = "com.google.guava", name = "guava", version.ref = "guava" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

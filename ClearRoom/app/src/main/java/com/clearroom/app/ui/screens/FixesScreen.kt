@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -71,8 +72,7 @@ fun FixesScreen(session: Session?, settings: FixSettings, view: FixesView?, onEv
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(AppTab.FIXES.labelRes), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.fixes_intro), style = MaterialTheme.typography.bodyLarge)
+        ScreenHeader(AppTab.FIXES, R.string.fixes_intro)
         when {
             session == null -> InfoCard { Body(R.string.results_no_room) }
             view == null -> InfoCard { Body(R.string.results_working) }
@@ -92,11 +92,11 @@ fun FixesScreen(session: Session?, settings: FixSettings, view: FixesView?, onEv
 private fun SummaryCard(outcome: FixesOutcome, settings: FixSettings) {
     val now = outcome.now.worstSeat(outcome.now.rows - 1)
     val after = outcome.after.worstSeat(outcome.after.rows - 1)
-    InfoCard {
+    HeroCard {
         Text(stringResource(R.string.fixes_summary_title), style = MaterialTheme.typography.titleMedium)
         if (settings.isAsMeasured) {
             Text(stringResource(R.string.fixes_summary_back_now, stringResource(now.band.phraseRes())), style = MaterialTheme.typography.titleLarge)
-            BandRange(now.band, now.stiLow, now.stiHigh)
+            BandRange(now.band, now.stiLow, now.stiHigh, large = true)
             Text(stringResource(R.string.fixes_summary_echo_now, decimals(speechEchoS(outcome.now), 1)), style = MaterialTheme.typography.bodyMedium)
             Body(R.string.fixes_summary_hint)
         } else {
@@ -105,7 +105,7 @@ private fun SummaryCard(outcome: FixesOutcome, settings: FixSettings) {
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(stringResource(R.string.fixes_summary_now, rangeText(now.band, now.stiLow, now.stiHigh)), style = MaterialTheme.typography.bodyMedium)
-            BandRange(after.band, after.stiLow, after.stiHigh)
+            BandRange(after.band, after.stiLow, after.stiHigh, large = true)
             Text(
                 stringResource(R.string.fixes_summary_echo, decimals(speechEchoS(outcome.now), 1), decimals(speechEchoS(outcome.after), 1)),
                 style = MaterialTheme.typography.bodyMedium,
@@ -180,7 +180,18 @@ private fun ControlsCard(session: Session, settings: FixSettings, onEvent: (UiEv
 private fun LabelledSlider(label: String, value: Float, range: ClosedFloatingPointRange<Float>, steps: Int = 0, onChange: (Float) -> Unit) {
     Column {
         Text(label, style = MaterialTheme.typography.bodyMedium)
-        Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps.coerceAtLeast(0), modifier = Modifier.semantics { contentDescription = label })
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = range,
+            steps = steps.coerceAtLeast(0),
+            // The unfilled part in grey: the theme's default for it is the accent, the same as the filled part at night.
+            colors = SliderDefaults.colors(
+                inactiveTrackColor = MaterialTheme.colorScheme.surfaceVariant,
+                inactiveTickColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            ),
+            modifier = Modifier.semantics { contentDescription = label },
+        )
     }
 }
 

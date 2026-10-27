@@ -20,9 +20,11 @@
     <string name="room_load_sample">Load sample room</string>
     <string name="room_details">Room details</string>
     <string name="room_field_name">Room name</string>
-    <string name="room_field_length">Length (m)</string>
-    <string name="room_field_width">Width (m)</string>
-    <string name="room_field_height">Height (m)</string>
+    <string name="room_field_length">Length</string>
+    <string name="room_field_width">Width</string>
+    <string name="room_field_height">Height</string>
+    <!-- The unit shown after a room size in the form -->
+    <string name="room_unit_metres">m</string>
     <string name="room_field_rows">Rows of seats</string>
     <string name="room_field_cols">Seats per row</string>
     <string name="room_field_students">Students usually present</string>

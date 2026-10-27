@@ -84,8 +84,7 @@ fun MeasureContent(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(AppTab.MEASURE.labelRes), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.measure_intro), style = MaterialTheme.typography.bodyLarge)
+        ScreenHeader(AppTab.MEASURE, R.string.measure_intro)
         when (micAccess) {
             MicAccess.NOT_ASKED -> MicAccessCard(R.string.mic_why, R.string.mic_allow, onAllowMic)
             MicAccess.DENIED_CAN_ASK_AGAIN -> MicAccessCard(R.string.mic_denied_can_ask_again, R.string.mic_allow, onAllowMic)

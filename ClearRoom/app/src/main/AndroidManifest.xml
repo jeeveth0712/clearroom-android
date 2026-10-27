@@ -4,6 +4,13 @@
 
     <!-- Sound levels only; no INTERNET permission on purpose (NFR-6, NFR-8). -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <!-- MediaPipe's usage-statistics library (com.google.android.datatransport) adds INTERNET to send
+         its task timings to Google. ClearRoom never goes online, so it is removed here and Android
+         blocks every connection; the statistics stay queued on the phone until they expire.
+         ACCESS_NETWORK_STATE stays: it can't send anything, and the library's retry scheduler needs it. -->
+    <uses-permission
+        android:name="android.permission.INTERNET"
+        tools:node="remove" />
     <uses-feature
         android:name="android.hardware.microphone"
         android:required="true" />

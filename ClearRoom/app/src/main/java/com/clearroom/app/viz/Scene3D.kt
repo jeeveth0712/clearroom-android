@@ -122,7 +122,7 @@ fun FramedScene3D(geometry: SceneGeometry, home: OrbitCamera, description: Strin
         geometry = geometry,
         home = home,
         description = description,
-        modifier = modifier.fillMaxWidth().aspectRatio(FRAME_ASPECT).clip(RoundedCornerShape(12.dp)).background(backdrop),
+        modifier = modifier.fillMaxWidth().aspectRatio(FRAME_ASPECT).clip(RoundedCornerShape(20.dp)).background(backdrop),
         labelText = SceneColors.LabelText,
         labelBackground = SceneColors.LabelBackground,
     )

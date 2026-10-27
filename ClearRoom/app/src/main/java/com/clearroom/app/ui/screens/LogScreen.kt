@@ -78,8 +78,7 @@ fun LogContent(
         modifier = modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(stringResource(AppTab.LOG.labelRes), style = MaterialTheme.typography.headlineSmall)
-        Text(stringResource(R.string.log_intro), style = MaterialTheme.typography.bodyLarge)
+        ScreenHeader(AppTab.LOG, R.string.log_intro)
         when {
             session == null -> InfoCard { Body(R.string.log_no_room) }
             session.room.id == SampleData.ROOM_ID -> InfoCard { Body(R.string.log_sample_room) }
@@ -109,8 +108,11 @@ fun LogContent(
 private fun ControlCard(log: DayLogState, spot: String?, measureBusy: Boolean, liveLevelDb: () -> Double, onEvent: (UiEvent) -> Unit) {
     if (log.running) {
         // The banner the risk table asks for: visible the whole time the microphone is on.
-        Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Card(
+            Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer),
+        ) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.log_banner), style = MaterialTheme.typography.titleMedium)
                 Text(stringResource(R.string.log_banner_detail), style = MaterialTheme.typography.bodySmall)
             }
