@@ -1,6 +1,7 @@
 package com.clearroom.app
 
 import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FieldChecks
 import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.audio.AudioSourceKind
@@ -8,6 +9,7 @@ import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.FieldProblem
+import com.clearroom.app.data.ListeningScore
 import com.clearroom.app.data.MicSetup
 import com.clearroom.app.data.RoomField
 import com.clearroom.app.data.RtTake
@@ -21,6 +23,7 @@ import com.clearroom.app.daylog.SoundLabel
 import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.measure.MeasurementRunner
+import com.clearroom.app.selftest.SelfTest
 import com.clearroom.app.testing.FakeAudioInput
 import com.clearroom.app.testing.FakeReportWriter
 import com.clearroom.app.testing.InMemoryLogStore
@@ -35,6 +38,7 @@ import com.clearroom.app.testing.flatBands
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.ReportState
 import com.clearroom.app.ui.RoomNotice
+import com.clearroom.app.ui.SelfTestState
 import com.clearroom.app.ui.UiEvent
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
@@ -810,5 +814,76 @@ class AppViewModelTest {
         vm.onEvent(UiEvent.StartRemeasuring)
         runCurrent()
         assertEquals(SampleData.session, vm.state.value.session)
+    }
+
+    // --- Self-test (M13) -------------------------------------------------------------------------------
+
+    @Test
+    fun `the self-test shows each result as it comes, then says it has finished`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.RunSelfTest)
+        assertTrue(vm.state.value.measure.selfTest.running)
+        assertEquals(0, vm.state.value.measure.selfTest.results.size)
+        runCurrent() // the first case is worked out on the (test) DSP dispatcher
+        vm.onEvent(UiEvent.RunSelfTest) // a second tap while running changes nothing
+        advanceUntilIdle()
+        val selfTest = vm.state.value.measure.selfTest
+        assertTrue(selfTest.finished)
+        assertEquals(SelfTest.cases, selfTest.results.map { it.case })
+        assertEquals(0, selfTest.failed)
+    }
+
+    @Test
+    fun `running the self-test again starts from an empty list`() = runTest {
+        val vm = startApp()
+        vm.onEvent(UiEvent.RunSelfTest)
+        advanceUntilIdle()
+        vm.onEvent(UiEvent.RunSelfTest)
+        assertEquals(SelfTestState(running = true), vm.state.value.measure.selfTest)
+        advanceUntilIdle()
+        assertTrue(vm.state.value.measure.selfTest.finished)
+    }
+
+    // --- Field tests (M13) ------------------------------------------------------------------------------
+
+    @Test
+    fun `the voice at a distance is recorded for 20 s without a seat and kept at the chosen distance`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SetCheckDistance(5.0))
+        vm.onEvent(UiEvent.StartMeasurement(MeasureKind.VOICE_AT_DISTANCE))
+        advanceUntilIdle()
+        assertEquals(listOf(20.0), audio.requestedSeconds)
+        assertEquals(MeasurePhase.Saved(MeasureKind.VOICE_AT_DISTANCE, seat = null), vm.phase())
+        assertEquals(listOf(5.0), assertNotNull(rooms.load("r1")).distanceReadings.map { it.distanceM })
+    }
+
+    @Test
+    fun `only the field test's distances can be chosen`() = runTest {
+        val vm = startWithRoom()
+        vm.onEvent(UiEvent.SetCheckDistance(4.0))
+        assertEquals(FieldChecks.CHECK_DISTANCES_M.first(), vm.state.value.measure.checkDistanceM)
+        vm.onEvent(UiEvent.SetCheckDistance(8.0))
+        assertEquals(8.0, vm.state.value.measure.checkDistanceM)
+    }
+
+    @Test
+    fun `listening scores are saved with the room and cleared with null, never in the sample`() = runTest {
+        val vm = startWithRoom(aMeasuredSeat(0, 0))
+        vm.onEvent(UiEvent.SetListeningScore(SeatId(0, 0), 16))
+        runCurrent()
+        assertEquals(listOf(ListeningScore(SeatId(0, 0), 16)), assertNotNull(rooms.load("r1")).listening)
+        vm.onEvent(UiEvent.SetListeningScore(SeatId(0, 0), null))
+        runCurrent()
+        assertEquals(emptyList(), assertNotNull(rooms.load("r1")).listening)
+
+        vm.onEvent(UiEvent.LoadSampleRoom)
+        vm.onEvent(UiEvent.SetListeningScore(SeatId(0, 0), 16))
+        runCurrent()
+        assertEquals(SampleData.session, vm.state.value.session)
+    }
+
+    @Test
+    fun `noise and claps need a seat, the voice recordings don't`() {
+        assertEquals(setOf(MeasureKind.NOISE, MeasureKind.CLAP), MeasureKind.entries.filter { it.atSeat }.toSet())
     }
 }

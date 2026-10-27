@@ -5,11 +5,13 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
+import com.clearroom.app.acoustics.FieldChecks
 import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.AudioClip
 import com.clearroom.app.audio.AudioInput
 import com.clearroom.app.audio.CaptureProblem
+import com.clearroom.app.data.DistanceReading
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.MicSetup
 import com.clearroom.app.data.RoomForm
@@ -30,6 +32,7 @@ import com.clearroom.app.measure.MeasurementRunner
 import com.clearroom.app.measure.bandLevelsOf
 import com.clearroom.app.report.Report
 import com.clearroom.app.report.ReportWriter
+import com.clearroom.app.selftest.SelfTest
 import com.clearroom.app.ui.DayLogView
 import com.clearroom.app.ui.Evaluation
 import com.clearroom.app.ui.FixesView
@@ -38,6 +41,7 @@ import com.clearroom.app.ui.MeasureUiState
 import com.clearroom.app.ui.ReportState
 import com.clearroom.app.ui.RoomNotice
 import com.clearroom.app.ui.RoomUiState
+import com.clearroom.app.ui.SelfTestState
 import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.UiState
 import kotlinx.coroutines.CoroutineDispatcher
@@ -120,6 +124,7 @@ class AppViewModel(
 
     private val runner = MeasurementRunner(audio, dsp)
     private var measurement: Job? = null
+    private var selfTest: Job? = null
 
     init {
         // Reopen the room the user saved last, so their work survives an app restart.
@@ -140,6 +145,8 @@ class AppViewModel(
             is UiEvent.SetClapDelay -> setClapDelay(event.seconds)
             is UiEvent.ClearClaps -> changeReadings { it.withoutClaps(event.seat) }
             is UiEvent.ClearSeat -> changeReadings { it.withoutSeat(event.seat) }
+            is UiEvent.SetCheckDistance -> if (event.distanceM in FieldChecks.CHECK_DISTANCES_M) updateMeasure { it.copy(checkDistanceM = event.distanceM) }
+            is UiEvent.SetListeningScore -> changeReadings { it.withListeningScore(event.seat, event.wordsRight) }
             is UiEvent.RoomFormChanged -> updateRoom { it.copy(form = event.form, problems = emptyMap(), notice = null) }
             UiEvent.SaveRoom -> viewModelScope.launch { saveRoom() }
             UiEvent.NewRoom -> newRoom()
@@ -151,6 +158,7 @@ class AppViewModel(
             UiEvent.StartLog -> startLog()
             UiEvent.StopLog -> dayLog.stop()
             UiEvent.ClearLogs -> _state.value.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID }?.let(dayLog::clear)
+            UiEvent.RunSelfTest -> runSelfTest()
             UiEvent.ShareReport -> shareReport()
             UiEvent.ReportShown -> _state.update { it.copy(report = ReportState.Idle) }
             UiEvent.StartRemeasuring -> changeReadings { it.startRemeasuring(clock()) }
@@ -177,13 +185,14 @@ class AppViewModel(
         val current = _state.value
         val roomId = current.session?.room?.id?.takeUnless { it == SampleData.ROOM_ID } ?: return
         val seat = current.measure.selectedSeat
-        if (kind != MeasureKind.VOICE && seat == null) return
+        if (kind.atSeat && seat == null) return
 
         measurement = viewModelScope.launch {
             setPhase(
                 when (kind) {
                     MeasureKind.NOISE -> measureNoise(roomId, requireNotNull(seat), current.measure.fans)
                     MeasureKind.VOICE -> measureVoice(roomId)
+                    MeasureKind.VOICE_AT_DISTANCE -> measureVoiceAt(roomId, current.measure.checkDistanceM)
                     MeasureKind.CLAP -> measureClap(roomId, requireNotNull(seat), current.measure.clapDelayS)
                 },
             )
@@ -200,6 +209,13 @@ class AppViewModel(
         record(MeasureKind.VOICE, analyse = ::bandLevelsOf).toPhase(MeasureKind.VOICE) { levels, mic ->
             if (saveMeasurement(roomId) { it.withVoice(levels).withMic(mic) } == null) MeasurePhase.SaveFailed
             else MeasurePhase.Saved(MeasureKind.VOICE, seat = null)
+        }
+
+    /** Field test "distance model": the voice [distanceM] from the speaker, kept with the room. */
+    private suspend fun measureVoiceAt(roomId: String, distanceM: Double): MeasurePhase =
+        record(MeasureKind.VOICE_AT_DISTANCE, analyse = ::bandLevelsOf).toPhase(MeasureKind.VOICE_AT_DISTANCE) { levels, mic ->
+            if (saveMeasurement(roomId) { it.withDistanceReading(DistanceReading(distanceM, levels)).withMic(mic) } == null) MeasurePhase.SaveFailed
+            else MeasurePhase.Saved(MeasureKind.VOICE_AT_DISTANCE, seat = null)
         }
 
     private suspend fun measureClap(roomId: String, seat: SeatId, delayS: Int): MeasurePhase =
@@ -275,6 +291,21 @@ class AppViewModel(
         measurement?.cancel()
         measurement = null
         setPhase(MeasurePhase.Idle)
+    }
+
+    // --- Self-test (doc "Analysis methods" step 4, NFR-3, NFR-4) ----------------------------------
+
+    /** Runs every self-test case off the main thread, showing each result as it comes. */
+    private fun runSelfTest() {
+        if (selfTest?.isActive == true) return
+        updateMeasure { it.copy(selfTest = SelfTestState(running = true)) }
+        selfTest = viewModelScope.launch {
+            SelfTest.cases.forEach { case ->
+                val result = withContext(dsp) { SelfTest.run(case) }
+                updateMeasure { it.copy(selfTest = it.selfTest.copy(results = it.selfTest.results + result)) }
+            }
+            updateMeasure { it.copy(selfTest = it.selfTest.copy(running = false)) }
+        }
     }
 
     // --- Report (FR-12) ----------------------------------------------------------------------

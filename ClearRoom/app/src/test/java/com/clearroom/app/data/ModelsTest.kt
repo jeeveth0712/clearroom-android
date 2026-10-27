@@ -285,4 +285,37 @@ class ModelsTest {
         assertEquals(mic, Session(aRoom()).withMic(mic).mic)
         assertFailsWith<IllegalArgumentException> { MicSetup(AudioSourceKind.UNPROCESSED, 0) }
     }
+
+    // --- Field tests (M13) ------------------------------------------------------------------------------
+
+    @Test
+    fun `a voice reading per distance, replaced when re-recorded, nearest first`() {
+        val session = Session(aRoom())
+            .withDistanceReading(DistanceReading(8.0, flatBands(-50.0)))
+            .withDistanceReading(DistanceReading(3.0, flatBands(-40.0)))
+            .withDistanceReading(DistanceReading(8.0, flatBands(-52.0)))
+        assertEquals(listOf(DistanceReading(3.0, flatBands(-40.0)), DistanceReading(8.0, flatBands(-52.0))), session.distanceReadings)
+        assertFailsWith<IllegalArgumentException> { DistanceReading(0.0, flatBands(-40.0)) }
+    }
+
+    @Test
+    fun `a listening score per seat, front to back, cleared with null`() {
+        val session = Session(aRoom()).withListeningScore(SeatId(4, 1), 12).withListeningScore(SeatId(0, 1), 19).withListeningScore(SeatId(4, 1), 14)
+        assertEquals(listOf(ListeningScore(SeatId(0, 1), 19), ListeningScore(SeatId(4, 1), 14)), session.listening)
+        assertEquals(listOf(ListeningScore(SeatId(0, 1), 19)), session.withListeningScore(SeatId(4, 1), null).listening)
+        assertFailsWith<IllegalArgumentException> { session.withListeningScore(SeatId(9, 0), 10) }
+        assertFailsWith<IllegalArgumentException> { ListeningScore(SeatId(0, 0), ListeningScore.WORDS + 1) }
+    }
+
+    @Test
+    fun `a smaller room drops the listening scores of seats that are gone`() {
+        val session = Session(aRoom()).withListeningScore(SeatId(0, 0), 18).withListeningScore(SeatId(4, 5), 10)
+        assertEquals(listOf(SeatId(0, 0)), session.withRoom(aRoom(rows = 2, cols = 2)).listening.map { it.seat })
+    }
+
+    @Test
+    fun `a distance recorded twice or a seat scored twice is refused`() {
+        assertFailsWith<IllegalArgumentException> { Session(aRoom(), distanceReadings = List(2) { DistanceReading(3.0, flatBands(-40.0)) }) }
+        assertFailsWith<IllegalArgumentException> { Session(aRoom(), listening = List(2) { ListeningScore(SeatId(0, 0), 10) }) }
+    }
 }

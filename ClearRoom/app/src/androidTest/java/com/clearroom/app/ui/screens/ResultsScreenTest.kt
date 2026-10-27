@@ -1,7 +1,9 @@
 package com.clearroom.app.ui.screens
 
 import androidx.annotation.StringRes
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
@@ -15,6 +17,8 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.pinch
 import androidx.compose.ui.test.swipeLeft
@@ -24,10 +28,12 @@ import com.clearroom.app.R
 import com.clearroom.app.acoustics.Cause
 import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FieldChecks
 import com.clearroom.app.acoustics.MissingInput
 import com.clearroom.app.acoustics.StiBand
 import com.clearroom.app.data.RtTake
 import com.clearroom.app.data.SampleData
+import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
 import com.clearroom.app.ui.Evaluation
 import com.clearroom.app.ui.ReportState
@@ -60,7 +66,13 @@ class ResultsScreenTest {
         ClearRoomTheme { ResultsScreen(session, evaluation, report, onEvent = { events += it }) }
     }
 
-    private fun showEvaluated(session: Session) = show(session, Evaluation.of(session))
+    private fun showEvaluated(session: Session) {
+        shown.value = session
+        compose.setContent {
+            val current = shown.value
+            ClearRoomTheme { ResultsScreen(current, current?.let(Evaluation::of), ReportState.Idle, onEvent = { events += it }) }
+        }
+    }
 
     private fun assertShown(text: String) {
         compose.onNodeWithText(text).performScrollTo().assertIsDisplayed()
@@ -331,5 +343,52 @@ class ResultsScreenTest {
         showEvaluated(withShorterEcho(mine.startRemeasuring(1L)))
         button(R.string.compare_stop).performScrollTo().performClick()
         compose.onNodeWithText(text(R.string.compare_stop_body_new)).assertIsDisplayed()
+    }
+
+    // --- Field tests (M13) -----------------------------------------------------------------------------
+
+    @Test
+    fun theCurtainCheck_asksHowMuchWasHung_thenComparesPredictionAndMeasurement() {
+        val after = withShorterEcho(mine.startRemeasuring(1L))
+        showEvaluated(after)
+        assertShown(text(R.string.field_curtain_hint))
+        val slider = compose.onNode(hasContentDescription(text(R.string.field_curtain_hung, 0)))
+        slider.performScrollTo().performSemanticsAction(SemanticsActions.SetProgress) { it(20f) }
+        val check = requireNotNull(FieldChecks.curtainCheck(mine, after, 20.0))
+        assertShown(text(R.string.field_curtain_row, decimals(check.beforeS, 2), decimals(check.predictedS, 2), decimals(check.measuredS, 2)))
+    }
+
+    @Test
+    fun typingAListeningScore_sendsIt_andTheSampleTakesNone() {
+        showEvaluated(mine)
+        compose.onNode(hasText(text(R.string.field_listening_field, 20))).performScrollTo().performTextInput("14")
+        assertTrue(events.toString(), UiEvent.SetListeningScore(SeatId(4, 2), 14) in events)
+    }
+
+    @Test
+    fun theSampleRoom_hasNoListeningScoreField() {
+        showEvaluated(sample)
+        compose.onNodeWithText(text(R.string.field_listening_field, 20)).assertDoesNotExist()
+    }
+
+    @Test
+    fun twoScoredSeats_showWhetherTheAppAgreesWithTheListeners() {
+        showEvaluated(mine.withListeningScore(SeatId(0, 2), 18).withListeningScore(SeatId(4, 2), 11))
+        assertShown(text(R.string.field_listening_ok))
+        showEvaluatedAgain(mine.withListeningScore(SeatId(0, 2), 9).withListeningScore(SeatId(4, 2), 17))
+        assertShown(text(R.string.field_listening_off, 1, 1))
+    }
+
+    @Test
+    fun oneScoredSeat_asksForASecond() {
+        showEvaluated(mine.withListeningScore(SeatId(0, 2), 18))
+        assertShown(text(R.string.field_listening_needs_two))
+    }
+
+    private val shown = mutableStateOf<Session?>(null)
+
+    /** Shows a second session in the same test (setContent can't be called twice). */
+    private fun showEvaluatedAgain(session: Session) {
+        compose.runOnIdle { shown.value = session }
     }
 }

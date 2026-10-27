@@ -22,6 +22,13 @@ enum class MeasureKind(val durationS: Double) {
 
     /** "Exact parameters": a 5-s recording with the clap about 1 s in (FR-2). */
     CLAP(5.0),
+
+    /** Field test "distance model": the same 20-s reading as the voice reference, a few metres away. */
+    VOICE_AT_DISTANCE(20.0),
+    ;
+
+    /** Noise and claps are measured at the picked seat; the voice recordings aren't. */
+    val atSeat: Boolean get() = this == NOISE || this == CLAP
 }
 
 sealed interface MeasureOutcome<out T> {

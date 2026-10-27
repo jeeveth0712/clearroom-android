@@ -1,10 +1,13 @@
 package com.clearroom.app.ui.screens
 
 import androidx.annotation.StringRes
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -12,8 +15,14 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.clearroom.app.R
+import com.clearroom.app.acoustics.ClarityModel
+import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FieldChecks
+import com.clearroom.app.acoustics.SpeechPropagation
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
+import com.clearroom.app.data.BandLevels
+import com.clearroom.app.data.DistanceReading
 import com.clearroom.app.data.FanState
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SeatId
@@ -22,14 +31,18 @@ import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.ClapTake
 import com.clearroom.app.measure.MeasureKind
 import com.clearroom.app.permission.MicAccess
+import com.clearroom.app.selftest.SelfTest
 import com.clearroom.app.ui.MeasurePhase
 import com.clearroom.app.ui.MeasureUiState
+import com.clearroom.app.ui.SelfTestState
 import com.clearroom.app.ui.UiEvent
 import com.clearroom.app.ui.theme.ClearRoomTheme
+import com.clearroom.app.viz.decimals
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlin.math.roundToInt
 
 /** The stateless Measure content for every permission state, room situation and phase; no real mic. */
 @RunWith(AndroidJUnit4::class)
@@ -210,7 +223,7 @@ class MeasureContentTest {
     @Test
     fun aSeatWithClaps_showsItsEchoTime_andCanClearThem() {
         show(measure = MeasureUiState(selectedSeat = SeatId(2, 3))) // the sample's seat with three claps
-        node(R.string.measure_clap_start, 3, ClapTake.TAKES_PER_SEAT).assertIsDisplayed()
+        node(R.string.measure_clap_more, 3).assertIsDisplayed() // three claps done: it offers another
         node(R.string.measure_rt_title).assertIsDisplayed()
         node(R.string.measure_rt_clear).performClick()
         assertEquals(UiEvent.ClearClaps(SeatId(2, 3)), events.last())
@@ -274,5 +287,84 @@ class MeasureContentTest {
     fun normally_thereIsNoReMeasuringNote() {
         show()
         compose.onNodeWithText(text(R.string.measure_remeasuring)).assertDoesNotExist()
+    }
+
+    // --- Self-test card (M13) -----------------------------------------------------------------------
+
+    private fun selfTestResults(failing: Int = 0) =
+        SelfTest.cases.mapIndexed { i, case -> SelfTest.run(case).let { if (i < failing) it.copy(passed = false) else it } }
+
+    @Test
+    fun theSelfTest_isOfferedWithoutARoomOrTheMicrophone() {
+        show(access = MicAccess.NOT_ASKED, session = null)
+        node(R.string.selftest_title).assertIsDisplayed()
+        compose.onNode(hasText(text(R.string.selftest_run)) and hasClickAction()).performScrollTo().performClick()
+        assertEquals(listOf(UiEvent.RunSelfTest), events)
+    }
+
+    @Test
+    fun whileRunning_theCardCountsTheChecks() {
+        val partial = selfTestResults().take(4)
+        show(measure = MeasureUiState(selfTest = SelfTestState(running = true, results = partial)))
+        node(R.string.selftest_running, 4, SelfTest.cases.size).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.selftest_run)).assertDoesNotExist()
+    }
+
+    @Test
+    fun whenAllPass_theSummarySaysSo_andTheRowsShowOnRequest() {
+        show(measure = MeasureUiState(selfTest = SelfTestState(results = selfTestResults())))
+        node(R.string.selftest_all_passed, SelfTest.cases.size, SelfTest.cases.size).assertIsDisplayed()
+        compose.onNodeWithText(text(R.string.selftest_group_clarity)).assertDoesNotExist()
+        compose.onNode(hasText(text(R.string.selftest_show_all)) and hasClickAction()).performScrollTo().performClick()
+        node(R.string.selftest_group_clarity).assertIsDisplayed()
+        node(R.string.selftest_group_refusal).assertIsDisplayed()
+    }
+
+    @Test
+    fun aFailedCheck_isListedWithoutAsking() {
+        show(measure = MeasureUiState(selfTest = SelfTestState(results = selfTestResults(failing = 1))))
+        node(R.string.selftest_some_failed, SelfTest.cases.size - 1, SelfTest.cases.size).assertIsDisplayed()
+        node(R.string.selftest_group_clarity).assertIsDisplayed()
+        compose.onAllNodes(hasText(text(R.string.selftest_fail))).assertCountEquals(1)
+        compose.onNodeWithText(text(R.string.selftest_group_echo)).assertDoesNotExist()
+    }
+
+    // --- Field tests (M13) -----------------------------------------------------------------------------
+
+    @Test
+    fun aSeatWithAgreeingClaps_saysTheyAreRepeatable_andOffersAnotherClap() {
+        val seat = SeatId(2, 3) // three sample claps
+        show(measure = MeasureUiState(selectedSeat = seat))
+        val takes = requireNotNull(ownRoom.measureAt(seat)).rtTakes
+        val repeatability = requireNotNull(FieldChecks.repeatability(takes))
+        node(R.string.field_repeat_ok, repeatability.claps, (repeatability.worstVariation * 100).roundToInt()).assertIsDisplayed()
+        node(R.string.measure_clap_more, takes.size).assertIsDisplayed()
+    }
+
+    @Test
+    fun theDistanceCheck_needsTheVoiceFirst() {
+        show(session = ownRoom.copy(voice = null))
+        node(R.string.field_distance_needs_voice).assertIsDisplayed()
+        compose.onNode(hasText(text(R.string.field_distance_start, "3", 20)) and hasClickAction()).performScrollTo().assertIsNotEnabled()
+    }
+
+    @Test
+    fun choosingADistance_andRecording_sendTheirEvents() {
+        show(measure = MeasureUiState(checkDistanceM = 5.0))
+        compose.onNode(hasText(text(R.string.field_distance_option, "8")) and hasClickAction()).performScrollTo().performClick()
+        compose.onNode(hasText(text(R.string.field_distance_start, "5", 20)) and hasClickAction()).performScrollTo().performClick()
+        assertEquals(listOf(UiEvent.SetCheckDistance(8.0), UiEvent.StartMeasurement(MeasureKind.VOICE_AT_DISTANCE)), events)
+    }
+
+    @Test
+    fun aReadingThatMatchesTheModel_isShownWithItsPass() {
+        val room = (ClarityModel.evaluate(ownRoom) as ClarityResult.Ready).room
+        val voice = requireNotNull(ownRoom.voice)
+        val predicted = BandLevels(List(7) { SpeechPropagation.levelDb(5.0, voice[it], room.roomConstantM2[it]) })
+        val withReading = ownRoom.withDistanceReading(DistanceReading(5.0, predicted))
+        val point = requireNotNull(FieldChecks.distanceCheck(withReading)).points.single()
+        show(session = withReading)
+        node(R.string.field_distance_row, "5", decimals(point.predictedDb, 0), decimals(point.measuredDb, 0), "0").assertIsDisplayed()
+        node(R.string.field_distance_ok, decimals(0.0, 1)).assertIsDisplayed()
     }
 }

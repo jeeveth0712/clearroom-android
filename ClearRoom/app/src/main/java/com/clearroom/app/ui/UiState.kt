@@ -3,6 +3,7 @@ package com.clearroom.app.ui
 import com.clearroom.app.acoustics.ClarityGrid
 import com.clearroom.app.acoustics.ClarityModel
 import com.clearroom.app.acoustics.ClarityResult
+import com.clearroom.app.acoustics.FieldChecks
 import com.clearroom.app.acoustics.FixSettings
 import com.clearroom.app.acoustics.Fixes
 import com.clearroom.app.acoustics.FixesOutcome
@@ -20,6 +21,8 @@ import com.clearroom.app.daylog.LogStats
 import com.clearroom.app.daylog.LogSummary
 import com.clearroom.app.measure.ClapProblem
 import com.clearroom.app.measure.MeasureKind
+import com.clearroom.app.selftest.SelfTest
+import com.clearroom.app.selftest.SelfTestResult
 import java.io.File
 
 /** Everything the screens show, one immutable value. Only AppViewModel writes it. */
@@ -101,10 +104,23 @@ data class MeasureUiState(
     /** Countdown before a clap recording: the doc's 3 s, or 10 s to walk from the seat to the front. */
     val clapDelayS: Int = CLAP_DELAYS_S.first(),
     val phase: MeasurePhase = MeasurePhase.Idle,
+    val selfTest: SelfTestState = SelfTestState(),
+    /** Field test "distance model": how far from the speaker the next voice recording is made, m. */
+    val checkDistanceM: Double = FieldChecks.CHECK_DISTANCES_M.first(),
 ) {
     companion object {
         val CLAP_DELAYS_S = listOf(3, 10)
     }
+}
+
+/** The self-test (doc "Analysis methods" step 4): the results so far, in [SelfTest.cases] order. */
+data class SelfTestState(val running: Boolean = false, val results: List<SelfTestResult> = emptyList()) {
+    val total: Int get() = SelfTest.cases.size
+    val finished: Boolean get() = !running && results.size == total
+    val failed: Int get() = results.count { !it.passed }
+
+    /** NFR-9: the slowest single clap analysis so far, ms; null before any echo case ran. */
+    val slowestClapMillis: Long? get() = results.mapNotNull { it.slowestMillis }.maxOrNull()
 }
 
 /** Steps of one measurement. Only legal states exist, so the screen is a single `when`. */
@@ -139,6 +155,10 @@ sealed interface UiEvent {
     data class SetClapDelay(val seconds: Int) : UiEvent
     data class ClearClaps(val seat: SeatId) : UiEvent
     data class ClearSeat(val seat: SeatId) : UiEvent
+    data class SetCheckDistance(val distanceM: Double) : UiEvent
+
+    /** Field test "listening check": [wordsRight] of 20 at [seat], or null to clear it. */
+    data class SetListeningScore(val seat: SeatId, val wordsRight: Int?) : UiEvent
 
     data class RoomFormChanged(val form: RoomForm) : UiEvent
     data object SaveRoom : UiEvent
@@ -153,6 +173,8 @@ sealed interface UiEvent {
     data object StartLog : UiEvent
     data object StopLog : UiEvent
     data object ClearLogs : UiEvent
+
+    data object RunSelfTest : UiEvent
 
     data object ShareReport : UiEvent
     data object ReportShown : UiEvent

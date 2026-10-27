@@ -364,6 +364,87 @@
     <string name="sound_quiet">quiet</string>
     <string name="sound_other">other sounds</string>
 
+    <!-- Measure tab: the self-test (doc "Analysis methods" step 4, NFR-3, NFR-4) -->
+    <string name="selftest_title">Check the app itself</string>
+    <string name="selftest_intro">Runs the measuring maths on made-up claps and rooms whose answers are known, right here on the phone. It takes a few seconds and doesn’t use the microphone.</string>
+    <string name="selftest_run">Run the self-test</string>
+    <string name="selftest_again">Run it again</string>
+    <string name="selftest_running">Checking %1$d of %2$d…</string>
+    <string name="selftest_all_passed">All checks passed: %1$d of %2$d</string>
+    <string name="selftest_some_failed">Checks passed: %1$d of %2$d. The ones that failed are listed below.</string>
+    <string name="selftest_speed">The slowest made-up clap took %1$d ms to analyse; a clap’s result must come within 5 s.</string>
+    <string name="selftest_show_all">Show every check</string>
+    <string name="selftest_hide_passed">Show only failed checks</string>
+    <string name="selftest_pass">✓ Pass</string>
+    <string name="selftest_fail">✗ Fail</string>
+    <string name="selftest_group_clarity">Clarity score (0–1) against an independent calculation: within 0.02</string>
+    <string name="selftest_group_echo">Echo time from made-up claps, three per check like a seat: within a tenth or 0.1 s, whichever is larger</string>
+    <string name="selftest_group_refusal">Recordings the app must refuse, with the right advice</string>
+    <!-- %1$s echo time (s), %2$s selftest_no_noise or selftest_snr, %3$s the app's score, %4$s the expected one -->
+    <string name="selftest_clarity_row">Echo %1$s s, %2$s: %3$s (expected %4$s)</string>
+    <string name="selftest_clarity_mixed">A different echo and noise at every pitch: %1$s (expected %2$s)</string>
+    <string name="selftest_no_noise">no noise</string>
+    <!-- %1$s signed dB, e.g. "+10" -->
+    <string name="selftest_snr">voice %1$s dB against the noise</string>
+    <!-- %1$s true echo time (s), %2$d dB, %3$s measured echo time (s) or selftest_no_value -->
+    <string name="selftest_echo_row">A clap fading in %1$s s, noise %2$d dB below it: measured %3$s s at speech pitches</string>
+    <string name="selftest_no_value">nothing</string>
+    <!-- %1$s the recording, %2$s what the app said -->
+    <string name="selftest_refusal_row">%1$s: %2$s</string>
+    <string name="selftest_kind_clipped">A clap too loud for the microphone</string>
+    <string name="selftest_kind_silence">Silence, as when another app holds the microphone</string>
+    <string name="selftest_kind_steady_noise">Steady noise with no clap in it</string>
+    <string name="selftest_kind_barely_above_noise">A clap only 20 dB above the noise</string>
+    <string name="selftest_kind_echo_too_long">An echo of 12 s, longer than any room</string>
+    <string name="selftest_outcome_accepted">accepted as a clap</string>
+    <string name="selftest_outcome_clipped">refused, too loud</string>
+    <string name="selftest_outcome_silent">refused, no sound came through</string>
+    <string name="selftest_outcome_no_clap">refused, no clap heard</string>
+    <string name="selftest_outcome_clap_louder">refused, clap louder</string>
+    <string name="selftest_outcome_too_noisy">refused, too noisy</string>
+    <string name="selftest_outcome_unclear">refused, echo unclear</string>
+
+    <!-- Field tests the app works out (doc testing table, M13) -->
+    <string name="measure_clap_more">Another clap (%1$d so far)</string>
+    <!-- %1$d claps, %2$d the largest spread in per cent -->
+    <string name="field_repeat_ok">Repeatable: these %1$d claps agree within %2$d%% at speech pitches (the field test asks for 10%% or less).</string>
+    <string name="field_repeat_spread">These %1$d claps spread %2$d%% at speech pitches, more than the 10%% the field test allows. Clap again, the same way each time.</string>
+    <string name="field_distance_title">Field test: voice by distance</string>
+    <string name="field_distance_hint">With the voice recorded at 1 m above, hold the phone 3, 5 and 8 m from the speaker, straight ahead, and record the same paragraph at each. The app compares each recording with what its room model predicts there.</string>
+    <!-- %1$s distance in m -->
+    <string name="field_distance_option">%1$s m</string>
+    <string name="field_distance_start">Record the voice at %1$s m (%2$d s)</string>
+    <string name="field_distance_needs_voice">Record the speaker’s voice at 1 m first: the prediction starts from it.</string>
+    <string name="field_distance_needs_room">Measure the echo and the background noise too, and the prediction appears here.</string>
+    <string name="field_distance_saved">Saved the voice at this distance.</string>
+    <!-- %1$s m, %2$s predicted dB, %3$s measured dB, %4$s difference, signed -->
+    <string name="field_distance_row">At %1$s m: predicted %2$s dB, measured %3$s dB (%4$s dB)</string>
+    <string name="field_distance_ok">Off by %1$s dB on average: within the 3 dB the field test allows.</string>
+    <string name="field_distance_off">Off by %1$s dB on average: more than the 3 dB the field test allows.</string>
+    <string name="field_curtain_title">Field test: did the curtains do what was predicted?</string>
+    <string name="field_curtain_hung">Curtains or sheets hung since ‘before’ (m²): %1$d</string>
+    <string name="field_curtain_hint">Set how much you hung to see the predicted echo time next to the measured one.</string>
+    <!-- %1$s before, %2$s predicted, %3$s measured; seconds -->
+    <string name="field_curtain_row">Echo time at speech pitches: %1$s s before, %2$s s predicted, %3$s s measured.</string>
+    <!-- %1$s predicted change, %2$s measured change; seconds -->
+    <string name="field_curtain_ok">Predicted %1$s s shorter, measured %2$s s shorter: within the 25%% the field test allows.</string>
+    <string name="field_curtain_off">Predicted %1$s s shorter, measured %2$s s shorter: more than 25%% apart.</string>
+    <string name="field_curtain_note">The prediction assumes heavy curtains; thin sheets absorb less.</string>
+    <string name="field_listening_title">Field test: listening check</string>
+    <!-- %1$d words -->
+    <string name="field_listening_field">Words written down right, of %1$d</string>
+    <string name="field_listening_hint">Read %1$d short words from the front; enter how many a listener here got right.</string>
+    <string name="field_listening_invalid">Enter a number from 0 to %1$d.</string>
+    <!-- %1$s seat, %2$d words right, %3$d words read -->
+    <string name="field_listening_row">%1$s: %2$d of %3$d words</string>
+    <!-- %1$s field_listening_row, %2$s clarity score -->
+    <string name="field_listening_row_sti">%1$s · clarity %2$s</string>
+    <string name="field_listening_needs_two">Score a second seat to compare them with the app.</string>
+    <string name="field_listening_too_close">The scored seats are too close in clarity for the app to tell apart; score seats further apart.</string>
+    <string name="field_listening_ok">The seats the app rates poorer scored lower: the app agrees with the listeners.</string>
+    <!-- %1$d disagreeing pairs, %2$d pairs compared -->
+    <string name="field_listening_off">Disagreements with the listeners: %1$d of %2$d</string>
+
     <!-- Results: share the report (FR-12) -->
     <string name="results_share">Share report (PDF)</string>
     <string name="results_share_writing">Making the report…</string>

@@ -23,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.listSaver
@@ -42,6 +43,7 @@ import com.clearroom.app.acoustics.RoomClarity
 import com.clearroom.app.acoustics.SeatClarity
 import com.clearroom.app.acoustics.StiBand
 import com.clearroom.app.data.ClapCurves
+import com.clearroom.app.data.ListeningScore
 import com.clearroom.app.data.SampleData
 import com.clearroom.app.data.SeatId
 import com.clearroom.app.data.Session
@@ -135,7 +137,11 @@ private fun ReadyResults(evaluation: Evaluation, clarity: RoomClarity, report: R
     VerdictCard(clarity, report, onEvent)
     evaluation.before?.let { CompareCard(evaluation, it, clarity, onEvent) }
     ClarityViewsCard(evaluation, clarity, seat.seat) { picked = it }
-    SeatDetailsCard(seat, seatLabel)
+    // The sample's readings are made up, so it takes no field-test scores.
+    val ownRoom = session.room.id != SampleData.ROOM_ID
+    SeatDetailsCard(seat, seatLabel, session.listening.firstOrNull { it.seat == seat.seat }, editable = ownRoom) { words ->
+        onEvent(UiEvent.SetListeningScore(seat.seat, words))
+    }
     evaluation.grid?.let { TerrainCard(it, clarity) }
     val decay = decaySource(session, seat.seat)
     ChartCard(R.string.results_decay_title) {
@@ -150,6 +156,7 @@ private fun ReadyResults(evaluation: Evaluation, clarity: RoomClarity, report: R
         MtfChart(MtfModel.of(clarity, seat), seatLabel)
     }
     ChartCard(R.string.results_distance_title) { DistanceChart(DistanceModel.of(clarity)) }
+    if (session.listening.isNotEmpty()) ListeningCheckCard(session)
     // The sample can't be measured into, so it can't be re-measured either.
     if (evaluation.before == null && session.room.id != SampleData.ROOM_ID) RemeasureCard(onEvent)
 }
@@ -210,6 +217,7 @@ private fun CompareCard(evaluation: Evaluation, before: Evaluation, after: RoomC
                 style = MaterialTheme.typography.bodyMedium,
             )
         }
+        if (beforeClarity != null && after != null) CurtainCheckSection(before.session, session)
         if (beforeClarity != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ComparedMap(R.string.compare_before, SeatMapModel(session.room, beforeClarity, before.grid), Modifier.weight(1f))
@@ -319,7 +327,7 @@ private fun CauseLegend() {
 }
 
 @Composable
-private fun SeatDetailsCard(seat: SeatClarity, seatLabel: String) {
+private fun SeatDetailsCard(seat: SeatClarity, seatLabel: String, score: ListeningScore?, editable: Boolean, onScore: (Int?) -> Unit) {
     InfoCard {
         Text(stringResource(R.string.results_seat_title, seatLabel), style = MaterialTheme.typography.titleMedium)
         BandRange(seat.band, seat.stiLow, seat.stiHigh)
@@ -334,6 +342,11 @@ private fun SeatDetailsCard(seat: SeatClarity, seatLabel: String) {
         Text(stringResource(R.string.results_spectrum_title), style = MaterialTheme.typography.titleSmall)
         SpectrumChart(SpectrumModel.of(seat))
         Text(stringResource(R.string.results_seat_hint), style = MaterialTheme.typography.bodySmall)
+        if (editable) {
+            Text(stringResource(R.string.field_listening_title), style = MaterialTheme.typography.titleSmall)
+            // Keyed by seat, so picking another seat shows its own score, not the last one typed.
+            key(seat.seat) { ListeningScoreField(seat.seat, score, onScore) }
+        }
     }
 }
 

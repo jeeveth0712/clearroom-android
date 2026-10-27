@@ -129,4 +129,32 @@ class RoomJsonTest {
         }.toString()
         assertEquals(session.copy(baseline = null, mic = null), RoomJson.decode(damaged).session)
     }
+
+    @Test
+    fun `field-test readings and scores survive a save and load`() {
+        val session = Session(aRoom(), seats = listOf(aMeasuredSeat(0, 1)))
+            .withDistanceReading(DistanceReading(5.0, flatBands(-42.5)))
+            .withListeningScore(SeatId(0, 1), 17)
+        assertEquals(session, roundTrip(session).session)
+    }
+
+    @Test
+    fun `a room saved before field tests still loads, with none`() {
+        val session = Session(aRoom())
+        val old = JSONObject(RoomJson.encode(session, 1L)).apply {
+            remove("distanceReadings")
+            remove("listening")
+        }.toString()
+        assertEquals(session, RoomJson.decode(old).session)
+    }
+
+    @Test
+    fun `damaged field-test entries are dropped one by one, keeping the rest and the room`() {
+        val session = Session(aRoom()).withListeningScore(SeatId(0, 1), 17).withListeningScore(SeatId(1, 1), 9)
+        val damaged = JSONObject(RoomJson.encode(session, 1L)).apply {
+            getJSONArray("listening").getJSONObject(1).put("wordsRight", 99) // more than 20 words
+            getJSONArray("listening").put(JSONObject().put("row", 50).put("col", 0).put("wordsRight", 3)) // outside the grid
+        }.toString()
+        assertEquals(listOf(ListeningScore(SeatId(0, 1), 17)), RoomJson.decode(damaged).session.listening)
+    }
 }

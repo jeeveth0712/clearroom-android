@@ -29,6 +29,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import androidx.compose.ui.unit.dp
 import com.clearroom.app.R
+import com.clearroom.app.acoustics.FieldChecks
 import com.clearroom.app.acoustics.Rt60Summary
 import com.clearroom.app.audio.CaptureProblem
 import com.clearroom.app.audio.ClipQuality
@@ -96,6 +97,8 @@ fun MeasureContent(
                 else -> Measurements(session, measure, liveLevelDb, onEvent)
             }
         }
+        // Needs neither a room nor the microphone: the phone checks its own maths.
+        SelfTestCard(measure.selfTest, onRun = { onEvent(UiEvent.RunSelfTest) })
     }
 }
 
@@ -165,6 +168,8 @@ private fun Measurements(session: Session, measure: MeasureUiState, liveLevelDb:
             BandLevelsTable(voice)
         }
     }
+
+    DistanceCheckCard(session, measure, onEvent)
 }
 
 /** Deleting readings can't be undone, so it asks first. */
@@ -208,7 +213,12 @@ private fun EchoCard(session: Session, measure: MeasureUiState, onEvent: (UiEven
             }
         }
         Button(onClick = { onEvent(UiEvent.StartMeasurement(MeasureKind.CLAP)) }, enabled = seat != null && !measure.phase.isBusy) {
-            Text(stringResource(R.string.measure_clap_start, takes.size, ClapTake.TAKES_PER_SEAT))
+            // Past three (the field test asks for five), it just counts.
+            if (takes.size < ClapTake.TAKES_PER_SEAT) {
+                Text(stringResource(R.string.measure_clap_start, takes.size, ClapTake.TAKES_PER_SEAT))
+            } else {
+                Text(stringResource(R.string.measure_clap_more, takes.size))
+            }
         }
         if (seat != null && summary != null) {
             Text(stringResource(R.string.measure_rt_title), style = MaterialTheme.typography.titleSmall)
@@ -217,6 +227,7 @@ private fun EchoCard(session: Session, measure: MeasureUiState, onEvent: (UiEven
                 stringResource(R.string.measure_rt_speech, summary.speechRt60S, Rt60Summary.CLASSROOM_TARGET_S),
                 style = MaterialTheme.typography.bodyMedium,
             )
+            FieldChecks.repeatability(takes)?.let { RepeatabilityLine(it) }
             if (summary.bands.any { it.estimated }) {
                 Text(stringResource(R.string.measure_rt_estimated), style = MaterialTheme.typography.bodySmall)
             }
@@ -237,11 +248,12 @@ private fun StatusCard(phase: MeasurePhase, liveLevelDb: () -> Double, onCancel:
             is MeasurePhase.Countdown -> stringResource(R.string.measure_countdown, phase.secondsLeft)
             is MeasurePhase.Recording -> when (phase.kind) {
                 MeasureKind.NOISE -> stringResource(R.string.measure_recording_noise, phase.kind.durationS)
-                MeasureKind.VOICE -> stringResource(R.string.measure_recording_voice, phase.kind.durationS)
+                MeasureKind.VOICE, MeasureKind.VOICE_AT_DISTANCE -> stringResource(R.string.measure_recording_voice, phase.kind.durationS)
                 MeasureKind.CLAP -> stringResource(R.string.measure_recording_clap)
             }
             is MeasurePhase.Saved -> when (phase.kind) {
                 MeasureKind.VOICE -> stringResource(R.string.measure_saved_voice)
+                MeasureKind.VOICE_AT_DISTANCE -> stringResource(R.string.field_distance_saved)
                 // Claps report through ClapAccepted; NOISE and CLAP both name the seat.
                 MeasureKind.NOISE, MeasureKind.CLAP ->
                     stringResource(R.string.measure_saved_noise, phase.seat?.let { seatLabel(it) }.orEmpty())

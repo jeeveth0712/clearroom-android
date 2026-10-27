@@ -142,6 +142,28 @@ data class MicSetup(val source: AudioSourceKind, val sampleRateHz: Int) {
  */
 data class Baseline(val takenAtMillis: Long, val voice: BandLevels?, val seats: List<SeatMeasure>)
 
+/**
+ * Field test "distance model" (doc testing table): the speaker's voice recorded [distanceM] from
+ * them, to compare with the model's prediction from the voice at 1 m.
+ */
+data class DistanceReading(val distanceM: Double, val voice: BandLevels) {
+    init {
+        require(distanceM.isFinite() && distanceM > 0.0) { "distance must be positive: $distanceM" }
+    }
+}
+
+/** Field test "listening check": how many of [WORDS] words read from the front a listener at [seat] wrote down right. */
+data class ListeningScore(val seat: SeatId, val wordsRight: Int) {
+    init {
+        require(wordsRight in 0..WORDS) { "words right must be 0–$WORDS, was $wordsRight" }
+    }
+
+    companion object {
+        /** The doc's listening check reads 20 short words. */
+        const val WORDS = 20
+    }
+}
+
 /** A room plus its measurements. Audio is never part of it (NFR-6). */
 data class Session(
     val room: Room,
@@ -151,10 +173,17 @@ data class Session(
     val mic: MicSetup? = null,
     /** FR-13: the readings from before a change while re-measuring; null otherwise. */
     val baseline: Baseline? = null,
+    /** Field test: the voice recorded at distances from the speaker, one per distance, nearest first. */
+    val distanceReadings: List<DistanceReading> = emptyList(),
+    /** Field test: listening-check scores, one per seat, front to back. */
+    val listening: List<ListeningScore> = emptyList(),
 ) {
     init {
         requireSeatsFit(seats, room)
         baseline?.let { requireSeatsFit(it.seats, room) }
+        require(distanceReadings.distinctBy { it.distanceM }.size == distanceReadings.size) { "a distance is recorded twice" }
+        require(listening.all { contains(it.seat) }) { "a listening score lies outside the grid" }
+        require(listening.distinctBy { it.seat }.size == listening.size) { "a seat is scored twice" }
     }
 
     /** The same session for an edited room, dropping measurements of seats that no longer exist (before and after). */
@@ -162,7 +191,20 @@ data class Session(
         room = newRoom,
         seats = seats.inside(newRoom),
         baseline = baseline?.let { it.copy(seats = it.seats.inside(newRoom)) },
+        listening = listening.filter { it.seat.row < newRoom.rows && it.seat.col < newRoom.cols },
     )
+
+    /** Field test: records (or replaces) the voice heard [reading]'s distance from the speaker. */
+    fun withDistanceReading(reading: DistanceReading): Session =
+        copy(distanceReadings = (distanceReadings.filterNot { it.distanceM == reading.distanceM } + reading).sortedBy { it.distanceM })
+
+    /** Field test: sets [seat]'s listening-check score, or clears it with null. */
+    fun withListeningScore(seat: SeatId, wordsRight: Int?): Session {
+        require(contains(seat)) { "seat $seat is outside the ${room.rows} x ${room.cols} grid" }
+        val others = listening.filterNot { it.seat == seat }
+        val scores = if (wordsRight == null) others else others + ListeningScore(seat, wordsRight)
+        return copy(listening = scores.sortedWith(compareBy({ it.seat.row }, { it.seat.col })))
+    }
 
     /** The room as it was before the change, measured with the "before" readings; null when not comparing. */
     val before: Session? get() = baseline?.let { Session(room, it.voice, it.seats) }

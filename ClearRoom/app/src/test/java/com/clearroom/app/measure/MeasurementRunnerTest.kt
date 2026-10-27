@@ -55,9 +55,9 @@ class MeasurementRunnerTest {
     }
 
     @Test
-    fun `each kind records for its own length - noise 30 s, voice 20 s, clap 5 s`() = runTest {
+    fun `each kind records for its own length - noise 30 s, voice 20 s, clap 5 s, voice at a distance 20 s`() = runTest {
         MeasureKind.entries.forEach { run(it) { clip -> clip.durationS } }
-        assertEquals(listOf(30.0, 20.0, 5.0), audio.requestedSeconds)
+        assertEquals(listOf(30.0, 20.0, 5.0, 20.0), audio.requestedSeconds)
     }
 
     private fun <T> MeasureOutcome<T>.measured(): T =

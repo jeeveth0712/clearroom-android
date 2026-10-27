@@ -5,7 +5,7 @@ done, where everything is, what has been built, what is decided, what is still o
 already hit. It is kept in the repository so it works from any account or tool.
 
 - **Last updated:** 2026-10-27, after milestone **M12** (commit `b7291bf`).
-- **Next step:** milestone **M13 — self-test screen and field tests** (section 9).
+- **Next step:** M13 fieldwork: the owner runs `docs/ClearRoom-Field-Tests.md` in 3–4 rooms (section 9). The self-test and field-test tools are built.
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
 
@@ -61,6 +61,7 @@ assignment_ed5518/                      git root (this repo)
 ├── ClearRoom Speech Clarity Checker — Requirements.md   spec + "Implementation notes" (keep updated)
 ├── docs/ClearRoom-Setup-and-Build-Plan.md               setup guide, milestones M1–M13 with ticks
 ├── docs/ClearRoom-Audit-M12.md         the M12 bug and security audit (findings, tools, what wasn't run)
+├── docs/ClearRoom-Field-Tests.md       the M13 field protocol and results table (the owner fills it in)
 ├── .claude/skills/<name>/SKILL.md      12 project guides; any agent can read them as docs
 ├── .mcp.json                           Semgrep + Context7 MCP config
 ├── tools/                              helper scripts (section 13)
@@ -335,12 +336,20 @@ All 15 views are built.
 | M10 | Log tab: day noise log (1 s band levels), YAMNet labels, keep-screen-on, V5, V11, clear logs | done `6bf1863` |
 | M11 | PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13) | done `8c50b31` |
 | M12 | Finish: new look, app icon, APK cap, signed release APK; full audit (`docs/ClearRoom-Audit-M12.md`) | done `b7291bf` (+ `d7c0dd0` APK cap) |
-| **M13** | **Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains)** | **next** |
+| **M13** | **Testing phase: in-app self-test + field-test tools (done, see below); the field protocol in 3–4 rooms (the owner's, to do)** | **part 1 done; fieldwork next** |
 
-**Notes for M13:**
-- The release APK has been checked on the phone (start, sample results, PDF and share, a day log with labels). The phone currently has the **release** build installed; `installDebug` replaces it (same key, rooms kept).
-- Read `.claude/skills/clearroom-testing/SKILL.md`; `scripts/sti_reference.py` gives the self-test's golden STI values.
-- The field tests need the owner in real rooms: plan them with the owner, don't script them.
+**M13 so far (part 1, the tools):**
+- **Self-test:** `selftest/SelfTest.kt` (30 cases: 15 golden STI, 10 synthetic-clap echo cases, 5 refusals; NFR-9 timing) and `selftest/SyntheticSignals.kt` (the clap generator, shared with the tests' `Signals`). It shows as the "Check the app itself" card at the bottom of the Measure tab; `SelfTestTest` runs the same list on the laptop.
+- **Field checks:** `acoustics/FieldChecks.kt` with repeatability, the curtain check, the distance check and the listening check. Each carries the testing table's pass rule.
+- **Field-check data:** saved with the room as `Session.distanceReadings` and `Session.listening` (optional JSON fields; a damaged entry is dropped on its own).
+- **Screens:** `ui/screens/FieldTestCards.kt`.
+  - Measure tab: the repeatability line under the echo times, "Another clap" past three, and the "Field test: voice by distance" card (`MeasureKind.VOICE_AT_DISTANCE`, distances 3/5/8 m).
+  - Results tab: the curtain check inside "Before and after", the listening score in seat details, and the listening-check card.
+- **The protocol for the owner:** `docs/ClearRoom-Field-Tests.md` gives the steps per room, the 20 words, and the results table to fill in.
+
+**Next for M13:** the owner runs the protocol in 3–4 rooms and fills in the table. Then copy the results into the requirements doc's Implementation notes, and tick M13 in the plan. Help with anything that turns up, but don't script the fieldwork.
+
+- The phone currently has the **release** build installed (with the self-test); `installDebug` replaces it (same key, rooms kept).
 - Before the video, remind the owner not to screen-record with the phone's microphone on.
 
 **The look (M12, owner's decisions):** inspired by the Dribbble shot "Crypto Trading Mobile App" (dribbble.com/shots/25559085). Dribbble blocks automated fetching and the owner hasn't sent a screenshot yet; if one comes, tune the look to it.
@@ -376,8 +385,8 @@ All 15 views are built.
 
 ## 11. Testing
 
-**Current counts:** 536 JVM tests, 133 device tests, lint 0 issues. All pass at `b7291bf`.
-M12 added `ThemeTest` (contrast and band-hue rules for both themes), `BackupRulesTest` and `PermissionsTest` (no INTERNET).
+**Current counts:** 573 JVM tests, 146 device tests, lint 0 issues. All pass at the M13 part 1 commit.
+M12 added `ThemeTest` (contrast and band-hue rules for both themes), `BackupRulesTest` and `PermissionsTest` (no INTERNET). M13 added `SelfTestTest`, `SelfTestStateTest` and `FieldChecksTest`.
 
 **Conventions:**
 - **Naming:** JVM tests use `kotlin.test` with backtick sentence names; androidTest uses camelCase names with JUnit4 and `createComposeRule` (v2).
@@ -436,6 +445,8 @@ M12 added `ThemeTest` (contrast and band-hue rules for both themes), `BackupRule
 - The phone drops off wireless adb when it dozes (screen off) and the owner takes calls on it: check `dumpsys power | grep mWakefulness` (`Awake`) and the top activity before each step, and ask the owner to keep it awake ("Stay awake" while charging) for long test runs.
 - `tap_text.py` scrolls only upward: swipe down first to reach buttons below a form. With the keyboard open, taps on fields under it go to the focused field instead: close the keyboard (`KEYCODE_BACK`) between fields.
 - Running a freshly downloaded program (detekt-cli jar) was refused by the session's permission check; don't work around it, list the tool as "Not run".
+- `connectedAndroidTest` puts test screens over whatever the owner is doing: check the top activity first (`dumpsys activity activities | grep topResumedActivity`) and wait while they use another app.
+- A bare `%` in a string resource breaks `getString(id, *args)` in tests ("Format specifier '% o'"): write `%%` in formatted strings, and avoid `%` in plain ones.
 
 **Product:**
 - Seats that don't fit merged into one block of bars, which is why the room form has a seat-fit check.
@@ -472,6 +483,6 @@ Other tools:
 ## 14. Resuming: checklist
 
 1. `git pull`; read this file, then the requirements doc's Implementation notes, then the skill for the next milestone.
-2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 536 JVM + 133 device tests.
+2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 573 JVM + 146 device tests.
 3. Tell the owner what you're about to build, and which third-party tools it needs.
 4. Follow the milestone loop (section 2). At the end, update this file's "Last updated" line, sections 8–11 and the commit table.

@@ -25,6 +25,8 @@ object RoomJson {
         .put("seats", seatsJson(session.seats))
         .put("mic", session.mic?.let { JSONObject().put("source", it.source.name).put("sampleRateHz", it.sampleRateHz) } ?: JSONObject.NULL)
         .put("baseline", session.baseline?.let(::encodeBaseline) ?: JSONObject.NULL)
+        .put("distanceReadings", JSONArray().apply { session.distanceReadings.forEach { put(JSONObject().put("distanceM", it.distanceM).put("voiceDb", numbers(it.voice.valuesDb))) } })
+        .put("listening", JSONArray().apply { session.listening.forEach { put(JSONObject().put("row", it.seat.row).put("col", it.seat.col).put("wordsRight", it.wordsRight)) } })
         .toString(2)
 
     /** @throws RoomFormatException when the text isn't a room this app version can read. */
@@ -45,6 +47,14 @@ object RoomJson {
                 mic = current.optJSONObject("mic")?.let { orNull { MicSetup(AudioSourceKind.valueOf(it.getString("source")), it.getInt("sampleRateHz")) } },
                 // Checked against the room the way a session checks it, so a bad "before" can't sink the room.
                 baseline = current.optJSONObject("baseline")?.let { orNull { decodeBaseline(it).also { before -> Session(room, baseline = before) } } },
+                // Field tests (M13): a damaged or doubled entry is dropped, never the room.
+                distanceReadings = current.optJSONArray("distanceReadings")?.objects().orEmpty()
+                    .mapNotNull { orNull { DistanceReading(it.getDouble("distanceM"), BandLevels(doubles(it.getJSONArray("voiceDb")))) } }
+                    .distinctBy { it.distanceM },
+                listening = current.optJSONArray("listening")?.objects().orEmpty()
+                    .mapNotNull { orNull { ListeningScore(SeatId(it.getInt("row"), it.getInt("col")), it.getInt("wordsRight")) } }
+                    .filter { it.seat.row < room.rows && it.seat.col < room.cols }
+                    .distinctBy { it.seat },
             ),
             savedAtMillis = current.getLong("savedAtMillis"),
         )

@@ -265,7 +265,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 
 **After the build: testing**
 
-- [ ] **M13 — Self-test and field tests.** In-app self-test screen (synthetic claps and known STI cases), then the doc's field protocol in 3–4 rooms: echo repeatability, distance model, curtain test, fan test, listening check, usability.
+- [ ] **M13 — Self-test and field tests.** In-app self-test screen (synthetic claps and known STI cases), then the doc's field protocol in 3–4 rooms: echo repeatability, distance model, curtain test, fan test, listening check, usability. *(In progress, Oct 27: the self-test (30 cases, all passing on the S24 Ultra) and the field-test tools are built; 573 laptop + 146 phone tests pass. The fieldwork in 3–4 rooms is next, following docs/ClearRoom-Field-Tests.md.)*
   *Skills:* clearroom-testing.
   *Done when:* the doc's testing table has a pass/fail result for every row.
 
