@@ -267,7 +267,7 @@ Builds on this laptop: the first full build takes a few minutes, later builds ab
 
 - [ ] **M13 — Self-test and field tests.** In-app self-test screen (synthetic claps and known STI cases), then the doc's field protocol in 3–4 rooms: echo repeatability, distance model, curtain test, fan test, listening check, usability. *(In progress, Oct 27: the self-test (30 cases, all passing on the S24 Ultra) and the field-test tools are built; 582 laptop + 146 phone tests pass after the UI concept follow-up, with lint clean. The fieldwork in 3–4 rooms is next, following docs/ClearRoom-Field-Tests.md.)*
 
-The latest signed release APK for submission is `dist/ClearRoom-latest.apk`; its checksum and install details are in `dist/README.md`. The one-minute video script and shot list are in `docs/ClearRoom-Demo-Video.md`. The UI concept follow-up does not mark M13 fieldwork complete.
+The latest signed release APK for submission is `dist/ClearRoom-latest.apk`; its checksum and install details are in `dist/README.md`. The one-minute submission and two-minute presentation scripts and shot lists are in `docs/ClearRoom-Demo-Video.md`. The UI concept follow-up does not mark M13 fieldwork complete.
   *Skills:* clearroom-testing.
   *Done when:* the doc's testing table has a pass/fail result for every row.
 
