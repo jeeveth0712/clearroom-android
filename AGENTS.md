@@ -4,8 +4,8 @@ Read this first. It is the complete handover: what the project is, how the owner
 done, where everything is, what has been built, what is decided, what is still open, and the traps
 already hit. It is kept in the repository so it works from any account or tool.
 
-- **Last updated:** 2026-10-27, after milestone **M11** (commit `8c50b31`).
-- **Next step:** milestone **M12 — finish and audit** (section 9).
+- **Last updated:** 2026-10-27, after milestone **M12** (commit `b7291bf`).
+- **Next step:** milestone **M13 — self-test screen and field tests** (section 9); first, try a day log on the release APK.
 - **Repository:** https://github.com/jeeveth0712/clearroom-android (branch `main`).
 - **Owner:** the student whose assignment this is (GitHub `jeeveth0712`). They write short messages ("m9", "ok next", "please start") and expect work to continue in the agreed order.
 
@@ -60,6 +60,7 @@ assignment_ed5518/                      git root (this repo)
 ├── CLAUDE.md                           imports this file for Claude Code
 ├── ClearRoom Speech Clarity Checker — Requirements.md   spec + "Implementation notes" (keep updated)
 ├── docs/ClearRoom-Setup-and-Build-Plan.md               setup guide, milestones M1–M13 with ticks
+├── docs/ClearRoom-Audit-M12.md         the M12 bug and security audit (findings, tools, what wasn't run)
 ├── .claude/skills/<name>/SKILL.md      12 project guides; any agent can read them as docs
 ├── .mcp.json                           Semgrep + Context7 MCP config
 ├── tools/                              helper scripts (section 13)
@@ -95,12 +96,17 @@ Skills (each `SKILL.md` is a focused how-to with the project's rules):
 - Gradle 9.6.0, Compose BOM 2026.09.00 (material3 1.4, which has no icon library: the tab icons are vector XML files).
 - lifecycle 2.11.0, coroutines 1.11.0.
 - MediaPipe Tasks Audio 1.1.1 (sound labels, M10), with Google's YAMNet model bundled at `app/src/main/assets/yamnet.tflite` (`noCompress += "tflite"`). Downloaded once at build time; runs offline.
+  - Its `protobuf-javalite` and `guava` are overridden by Gradle constraints (4.36.2 and 33.7.2-android) because MediaPipe's own versions have CVEs (M12 audit).
+  - Its statistics library adds the INTERNET permission; `AndroidManifest.xml` removes it (`tools:node="remove"`) and `PermissionsTest` checks it.
+- Manrope font, bundled at `res/font/manrope.ttf` (one variable file, SIL OFL; licence in `assets/licenses/manrope-OFL.txt`).
 - Tests use org.json 20260814 (the real library, because android.jar's copy is a stub) and `kotlin-test-junit`.
 
 **App configuration:**
 - Package `com.clearroom.app`; `minSdk 29`, `targetSdk 37`.
 - `testBuildType = "uiTest"`, with `applicationIdSuffix ".uitest"`, so on-phone tests install a separate app and **never wipe the owner's saved rooms**.
 - **APK size cap: 95 MB** (owner's rule). `ndk.abiFilters` keeps only `arm64-v8a` and `armeabi-v7a`: MediaPipe's native library is 10–21 MB per processor type, and x86/x86_64 alone added 38 MB. The `check<Variant>ApkSize` task in `app/build.gradle.kts` runs after every packaging and with `check`, and fails the build above 95,000,000 bytes. Sizes now: debug 65.5 MB, release 36.7 MB (was 105 and 75). Lint's `ChromeOsAbiSupport` is disabled for this, with the reason in the build file.
+- **Release build:** signed with the Android debug key (owner's choice, M12), so it installs over the debug app and keeps the rooms. R8 shrinks the whole app; `app/proguard-rules.pro` keeps MediaPipe, protobuf, Flogger and datatransport (none ship rules). **Never set `optimization.packageScope` again**: the template's `androidx/kotlin/kotlinx` scope built an APK that crashed on start. Sizes: release 34 MB, debug 65 MB.
+- **Backups:** only `files/rooms/` and `files/logs/` (`res/xml/data_extraction_rules.xml`, `backup_rules.xml`; `BackupRulesTest`).
 
 **Command line (Git Bash).** Set these first:
 
@@ -183,7 +189,13 @@ cd ClearRoom
   - Shared words: `rangeText(resources, …)` in `ResultsParts.kt`, `rt60Caption(resources, model)` in `Rt60Chart.kt`; `FixPreset.nameRes`, `CostTier.textRes`, `signedSti`, `FanState.labelRes` are `internal`.
 - **UI:**
   - `ui/screens/`: `RoomScreen`, `MeasureScreen`, `ResultsScreen`, `FixesScreen`, `LogScreen`, plus `ResultsParts.kt` (shared cards, band/cause wording, and `ConfirmFirst`, a button that asks before it acts).
-  - `ui/theme/`: `StiColors.kt` (fixed band colours), `SceneColors.kt` (3D palette).
+  - `ui/theme/`:
+    - `Color.kt`: the brand (`Ink` #111318, `Lime` #D4F25C), the light and dark `ColorScheme`s, and `BrandColors` (hero card and tab bar) read through `ClearRoomTheme.brand`;
+    - `Type.kt`: the Manrope family (each weight sets the font's weight axis explicitly) and the type scale;
+    - `Theme.kt`: `ClearRoomTheme` (follows the phone's dark mode; no dynamic colour) and `ClearRoomShapes`;
+    - `StiColors.kt` (fixed band colours), `SceneColors.kt` (3D palette).
+  - Shared screen pieces in `ResultsParts.kt`: `ScreenHeader`, `InfoCard`/`ChartCard` (white cards), `HeroCard` + `HeroButton` (the one bold card per screen), `BandRange(large = true)`.
+  - The tab bar is a custom floating pill in `ClearRoomApp.kt` (`selectable` + `Role.Tab`, so tests find tabs by text and `assertIsSelected` works).
 - **Visualizations:**
   - 2D: `viz/ChartKit.kt` (Axis with nice ticks, `drawFrame`, `ChartStyle`, `ChartColors`, `decimals()`), `SeatMap.kt`, `Rt60Chart.kt`, `DecayChart.kt`, `SeatCharts.kt` (V13–V15), `FixCharts.kt` (V6, V7), `DayLogCharts.kt` (V5, clock times, sound-label colours), `RoomPlan.kt`.
   - 3D: `viz/Scene3D.kt` (renderer, gestures, `FramedScene3D`), `ClarityRoom3D.kt` (V8, V12), `Surfaces3D.kt` (V9, V10, and `chartView()` shared with V11), `NoiseLandscape3D.kt` (V11), and `math3d/` (`Vec3`, `Mat4`, `OrbitCamera`, `Projection`, `Face3`, `Solid`, `SceneGeometry`, `ScenePass`, `Argb`).
@@ -322,20 +334,20 @@ All 15 views are built.
 | M9 | Fixes tab: what-if controls, V12, V6, V7 | done `76e3515` |
 | M10 | Log tab: day noise log (1 s band levels), YAMNet labels, keep-screen-on, V5, V11, clear logs | done `6bf1863` |
 | M11 | PDF report + share (FileProvider, ACTION_SEND), before/after (FR-13) | done `8c50b31` |
-| **M12** | **Finish: empty states, error text, app icon, release APK; full bug and vulnerability audit** | **next** |
-| M13 | Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains) | to do |
+| M12 | Finish: new look, app icon, APK cap, signed release APK; full audit (`docs/ClearRoom-Audit-M12.md`) | done `b7291bf` (+ `d7c0dd0` APK cap) |
+| **M13** | **Testing phase: in-app self-test screen + field protocol in 3–4 rooms (including a 10-minute classroom day log, and predicted vs measured change after hanging curtains)** | **next** |
 
-**Notes for M12:**
-- **Start with the redesign** (owner's decisions, 2026-10-27), inspired by the Dribbble shot "Crypto Trading Mobile App" (dribbble.com/shots/25559085). Dribbble blocks automated fetching, so ask the owner for a screenshot.
-  - Light by default; dark when the phone is in dark mode (both polished).
-  - Lime accent `#D4F25C` with black (`#111318`) pill buttons and nav bar; white cards on a soft grey background; big bold numbers for the verdicts.
-  - Font: **Manrope**, bundled (Google Fonts, OFL licence; a third-party download, so tell the owner when fetching it).
-  - The clarity band colours (`StiColors.kt`) never change, and nothing else may use red, orange or blue.
-  - Then do the rest of M12 in the new style.
-- Read `.claude/skills/bug-vulnerability-audit/SKILL.md` (and its checklists) first; the Semgrep MCP failed to connect in the M11 session, so check it or run `semgrep` another way, and name every scanner before using it.
-- Look for: empty states and error text on every tab, a real app icon (the template one is still in place), the app name, a signed release APK (signing keys stay out of git; ask the owner where to keep them).
-- The release build has `optimization { enable = true }`: check that MediaPipe, org.json and Compose still work in release (install the release APK and run the sample room, a clap, a day log and a report).
+**Notes for M13:**
+- **First:** install the release APK (`ClearRoom/app/build/outputs/apk/release/app-release.apk`) and run a short day log in a throwaway room. That's the one release path not yet tried on the phone (MediaPipe after shrinking). If the labels say "weren't available", or the app crashes, check the keep rules. Delete the throwaway room afterwards, and don't log into the owner's room.
+- Read `.claude/skills/clearroom-testing/SKILL.md`; `scripts/sti_reference.py` gives the self-test's golden STI values.
+- The field tests need the owner in real rooms: plan them with the owner, don't script them.
 - Before the video, remind the owner not to screen-record with the phone's microphone on.
+
+**The look (M12, owner's decisions):** inspired by the Dribbble shot "Crypto Trading Mobile App" (dribbble.com/shots/25559085). Dribbble blocks automated fetching and the owner hasn't sent a screenshot yet; if one comes, tune the look to it.
+- Light by default, dark when the phone is in dark mode, both polished.
+- Lime `#D4F25C` with ink `#111318` buttons and tab bar; white cards on soft grey; big bold numbers in the hero cards.
+- Manrope bundled.
+- The clarity band colours never change, and nothing else may use red, orange or blue: `ThemeTest` enforces this.
 
 ## 10. Decisions still open (owner's call; current default in bold)
 
@@ -358,12 +370,14 @@ All 15 views are built.
    - day-log events: 10 s gap bridging, "other" excluded (seen on the phone: a fan's label flickers);
    - re-measuring clears the seats and keeps the voice; the report lists only fixes worth +0.01 or more;
    - APKs stay under 95 MB, for ARM phones only (section 4);
-   - the M12 look: light + dark, lime on black, Manrope (section 9).
-8. **Owner's own room:** saved as "Sample classroom", 3.5 × 2.5 × 3 m, but still with 5 × 6 seats (only 1 × 2 fit; the form now refuses this). It needs 1 row × 2 seats and fresh measurements. Its claps predate the saved curves, so V3 and V10 ask for a new clap.
+   - the M12 look: light + dark, lime on black, Manrope (section 9);
+   - the release APK is signed with the Android debug key.
+8. **Owner's own room:** saved as "Sample classroom" (same name as the built-in sample, but its own id). The owner has since edited it to 6 × 7 × 3 m, 4 rows × 5 seats, 12 students, and it reads "Good 0.69" at the back. Never log or measure into it from a script.
 
 ## 11. Testing
 
-**Current counts:** 530 JVM tests, 131 device tests, lint 0 issues. All pass at `8c50b31`.
+**Current counts:** 536 JVM tests, 133 device tests, lint 0 issues. All pass at `b7291bf`.
+M12 added `ThemeTest` (contrast and band-hue rules for both themes), `BackupRulesTest` and `PermissionsTest` (no INTERNET).
 
 **Conventions:**
 - **Naming:** JVM tests use `kotlin.test` with backtick sentence names; androidTest uses camelCase names with JUnit4 and `createComposeRule` (v2).
@@ -394,6 +408,10 @@ All 15 views are built.
 - `@ExperimentalMaterial3Api` is needed for `SegmentedButton`; `animateFloatAsState` in a loop is fine while the count is fixed (wrap it in `key(...)`).
 - Two same-named `private`/`internal` composables in one package (`InfoCard`) cause overload ambiguity, so share them from `ui/screens/ResultsParts.kt`.
 - A backtick test name can't contain `:` (it fails to compile on the JVM target); use `-`.
+- **Release shrinking:** debug builds and every test run unshrunk, so a broken R8 setup only shows when the release APK is installed. After any change to the build, dependencies or keep rules, install `app-release.apk` and open it. `optimization.packageScope` crashed it on start (M12).
+- **Merged manifest:** libraries add permissions. Check `app/build/intermediates/merged_manifest/release/.../AndroidManifest.xml` after adding one (MediaPipe brought in INTERNET).
+- **Variable fonts:** `Font(R.font.manrope, weight)` alone drew every weight thin; pass `variationSettings = FontVariation.Settings(FontVariation.weight(...))`.
+- **Material 3 roles:** the slider's unfilled track uses `secondaryContainer`, which is lime here (for segmented buttons), so the Fixes sliders set `inactiveTrackColor` explicitly. Check sliders, chips and switches when changing a scheme role.
 
 **Coroutines:**
 - `withContext(NonCancellable + io) { … }` in a `finally` still rethrows `CancellationException` when it returns into the cancelled coroutine, so code **after** it never runs. Put every state update **inside** the block (this kept the day log saying "running" after Stop).
@@ -415,6 +433,9 @@ All 15 views are built.
 - When writing a file that changed on disk since you last read it, read it again first.
 - The app reopens on the **last tab**, so tap the Room tab before "Load sample room" when scripting taps.
 - **The phone:** connect by service name, keep it unlocked, check the call state (section 4).
+- The phone drops off wireless adb when it dozes (screen off) and the owner takes calls on it: check `dumpsys power | grep mWakefulness` (`Awake`) and the top activity before each step, and ask the owner to keep it awake ("Stay awake" while charging) for long test runs.
+- `tap_text.py` scrolls only upward: swipe down first to reach buttons below a form. With the keyboard open, taps on fields under it go to the focused field instead: close the keyboard (`KEYCODE_BACK`) between fields.
+- Running a freshly downloaded program (detekt-cli jar) was refused by the session's permission check; don't work around it, list the tool as "Not run".
 
 **Product:**
 - Seats that don't fit merged into one block of bars, which is why the room form has a seat-fit check.
@@ -436,6 +457,14 @@ MSYS_NO_PATHCONV=1 $A shell input swipe 60 2300 60 1000 600      # scroll (start
 
 The screen is 1440 × 3120 px. `tools/tap_text.py` taps the element whose text matches, using a uiautomator dump. It refuses to act unless ClearRoom is the app in front: the phone is the owner's own, so never tap or swipe in their other apps.
 
+**Both themes without touching the owner's dark-mode setting:** write a throwaway androidTest (don't commit it) that sets `ClearRoomTheme(darkTheme = true/false) { ClearRoomApp(...) }` with the sample, clicks each tab and saves `compose.onRoot().captureToImage()` as PNGs under `filesDir/shots`. Then install and run it without the usual uninstall, and copy the files off:
+
+```bash
+./gradlew.bat installUiTest installUiTestAndroidTest -q
+MSYS_NO_PATHCONV=1 $A shell am instrument -w -e class com.clearroom.app.scratch.DesignShotsTest com.clearroom.app.uitest.test/androidx.test.runner.AndroidJUnitRunner
+MSYS_NO_PATHCONV=1 $A exec-out run-as com.clearroom.app.uitest cat files/shots/light_results_1.png > light_results_1.png
+```
+
 Other tools:
 - `tools/sort_imports.py` sorts imports in ktlint order: everything else alphabetically, then `java`, `javax`, `kotlin`.
 - `tools/unused_imports.py` removes unused imports (keeps `getValue`/`setValue`).
@@ -443,6 +472,6 @@ Other tools:
 ## 14. Resuming: checklist
 
 1. `git pull`; read this file, then the requirements doc's Implementation notes, then the skill for the next milestone.
-2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 530 JVM + 131 device tests.
+2. Set the environment variables (section 4), connect the phone by service name, and run `./gradlew.bat test lintDebug connectedAndroidTest -q` to confirm a green start: 536 JVM + 133 device tests.
 3. Tell the owner what you're about to build, and which third-party tools it needs.
 4. Follow the milestone loop (section 2). At the end, update this file's "Last updated" line, sections 8–11 and the commit table.
